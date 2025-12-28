@@ -1,0 +1,5 @@
+*.pdb
+*.rdi
+*.exe
+*.sublime-workspace
+*.sublime-project
