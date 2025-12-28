@@ -111,7 +111,7 @@ foreign lib {
 }
 
 // RASTER PIPELINE
-DepthTestInfo :: struct {
+DepthTestInfo :: struct #all_or_none {
 	depth_attachment_format: vk.Format,
 	enable_depth_write:      Bool8,
 	depth_test_compare_op:   vk.CompareOp,
