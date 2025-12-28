@@ -700,8 +700,6 @@ cmd_simplest_test :: proc() {
 	))
 
 	// CommandRecorder can create ExecutableCommandList from the currently recorded commands.
-	// After calling complete_current_commands, the current commands are cleared.
-	// After calling complete_current_commands, you may record more commands and make new ExecutableCommandList with the recorder.
 	executable_commands: daxa.ExecutableCommandList
 	daxa.cmd_complete_current_commands(recorder, &executable_commands)
 
