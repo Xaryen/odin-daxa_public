@@ -9,7 +9,7 @@ _ :: lib
 // info only, these aren't exposed through the api
 MAX_COMPUTE_QUEUE_COUNT  :: 4
 MAX_TRANSFER_QUEUE_COUNT :: 2
-MAX_TOTAL_QUEUE_COUNT    :: (1 + MAX_COMPUTE_QUEUE_COUNT + MAX_TRANSFER_QUEUE_COUNT)
+QUEUE_COUNT    :: (1 + MAX_COMPUTE_QUEUE_COUNT + MAX_TRANSFER_QUEUE_COUNT)
 
 // these might not be necessary since they're almost more verbose than the literal
 QUEUE_MAIN       :: Queue{.MAIN, 0}
@@ -348,6 +348,11 @@ Queue :: struct {
 	index:  u32,
 }
 
+QueueSubmitIndexPair :: struct {
+	queue: Queue,
+	index: u64,
+}
+
 CommandSubmitInfo :: struct {
 	queue:                           Queue,
 	wait_stages:                     vk.PipelineStageFlags,
@@ -361,6 +366,8 @@ CommandSubmitInfo :: struct {
 	wait_timeline_semaphore_count:   u64,
 	signal_timeline_semaphores:      ^TimelinePair,
 	signal_timeline_semaphore_count: u64,
+	wait_queue_submit_indices:       ^QueueSubmitIndexPair,
+	wait_queue_submit_indices_count: u64,
 }
 
 PresentInfo :: struct {
@@ -370,8 +377,23 @@ PresentInfo :: struct {
 	queue:                       Queue,
 }
 
+
+WaitOnSubmitInfo :: struct {
+	queue:              Queue,
+	queue_submit_index: u64,
+	timeout:            u64,
+}
+DEFAULT_WAIT_ON_SUBMIT_INFO :: WaitOnSubmitInfo{}
+
+
 MemoryBlockBufferInfo :: struct {
 	buffer_info:  BufferInfo,
+	memory_block: ^MemoryBlock,
+	offset:       c.size_t,
+}
+
+MemoryBlockTlasInfo :: struct {
+	tlas_info:    TlasInfo,
 	memory_block: ^MemoryBlock,
 	offset:       c.size_t,
 }
@@ -543,9 +565,11 @@ foreign lib {
 	dvc_queue_wait_idle             :: proc(device: Device, queue: Queue) -> Result ---
 	dvc_queue_count                 :: proc(device: Device, queue_family: QueueFamily, out_value: ^u32) -> Result ---
 	dvc_wait_idle                   :: proc(device: Device) -> Result ---
-	dvc_submit                      :: proc(device: Device, info: ^CommandSubmitInfo) -> Result ---
+	dvc_submit                      :: proc(device: Device, info: ^CommandSubmitInfo, out_submit_index: ^u64) -> Result ---
 	dvc_latest_submit_index         :: proc(device: Device, submit_index: ^u64) -> Result ---
 	dvc_oldest_pending_submit_index :: proc(device: Device, submit_index: ^u64) -> Result ---
+	dvc_latest_queue_submit_index   :: proc(device: Device, queue: Queue, submit_index: ^u64) -> Result ---
+	dvc_wait_on_submit              :: proc(device: Device, info: WaitOnSubmitInfo) -> Result ---
 	dvc_present                     :: proc(device: Device, info: ^PresentInfo) -> Result ---
 	dvc_collect_garbage             :: proc(device: Device) -> Result ---
 	dvc_info                        :: proc(device: Device) -> ^DeviceInfo2 ---
