@@ -321,6 +321,7 @@ compute_triangle :: proc() {
 				signal_timeline_semaphores = &timeline_pair,
 				signal_timeline_semaphore_count = 1,
 			},
+			out_submit_index = nil,
 		))
 
 		daxa.executable_commands_dec_refcnt(executable_commands)
@@ -551,6 +552,7 @@ triangle :: proc() {
 				signal_timeline_semaphores = &timeline_pair,
 				signal_timeline_semaphore_count = 1,
 			},
+			out_submit_index = nil,
 		))
 
 		daxa.executable_commands_dec_refcnt(executable_commands)
@@ -667,6 +669,7 @@ pink_screen :: proc() {
 				signal_timeline_semaphores = &timeline_pair,
 				signal_timeline_semaphore_count = 1,
 			},
+			out_submit_index = nil,
 		))
 
 		daxa.executable_commands_dec_refcnt(executable_commands)
@@ -710,6 +713,7 @@ cmd_simplest_test :: proc() {
 	daxa.dvc_submit(
 		ctx.device,
 		info = &{ command_lists = &executable_commands, },
+		out_submit_index = nil,
 	)
 
 	daxa.executable_commands_dec_refcnt(executable_commands)
@@ -1028,6 +1032,7 @@ cmd_copy_test :: proc() {
 			command_lists = &executable_commands,
 			command_list_count = 1,
 		},
+		out_submit_index = nil,
 	))
 
 	result(daxa.dvc_wait_idle(ctx.device))
@@ -1110,7 +1115,7 @@ cmd_deferred_destruction_test :: proc() {
 	result(daxa.cmd_complete_current_commands(recorder, &executable_commands))
 
 	// Even after this call the resources will still be alive, as zombie resources are not checked to be dead in submit calls.
-	result(daxa.dvc_submit(ctx.device, &{command_lists = &executable_commands, command_list_count = 1,},))
+	result(daxa.dvc_submit(ctx.device, &{command_lists = &executable_commands, command_list_count = 1,}, out_submit_index = nil,))
 }
 
 cmd_multiple_ecl_test :: proc() {
@@ -1179,6 +1184,7 @@ cmd_multiple_ecl_test :: proc() {
 			signal_binary_semaphores = &sema,
 			signal_binary_semaphore_count = 1,
 		},
+		out_submit_index = nil,
 	))
 
 	result(daxa.dvc_submit(
@@ -1190,6 +1196,7 @@ cmd_multiple_ecl_test :: proc() {
 			wait_binary_semaphores = &sema,
 			wait_binary_semaphore_count = 1,
 		},
+		out_submit_index = nil,
 	))
 
 	daxa.executable_commands_dec_refcnt(executable_commands_0)
@@ -1360,6 +1367,7 @@ cmd_build_acceleration_structure_test :: proc(){
 			command_lists = &executable_commands,
 			command_list_count = 1,
 		},
+		out_submit_index = nil,
 	))
 	daxa.dvc_wait_idle(ctx.device)
 
@@ -1445,7 +1453,8 @@ async_queues_simple_submit_chain :: proc() {
 				command_list_count = 1,
 				signal_binary_semaphores = &sema0,
 				signal_binary_semaphore_count = 1,
-			}
+			},
+			out_submit_index = nil,
 		)
 	}
 
@@ -1483,7 +1492,8 @@ async_queues_simple_submit_chain :: proc() {
 				wait_binary_semaphore_count = 1,
 				signal_binary_semaphores = &sema1,
 				signal_binary_semaphore_count = 1,
-			}
+			},
+			out_submit_index = nil,
 		)
 	}
 
@@ -1519,7 +1529,8 @@ async_queues_simple_submit_chain :: proc() {
 				command_list_count = 1,
 				wait_binary_semaphores = &sema1,
 				wait_binary_semaphore_count = 1,
-			}
+			},
+			out_submit_index = nil,
 		)
 	}
 
