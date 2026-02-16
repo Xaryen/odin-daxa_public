@@ -17,7 +17,7 @@ foreign lib {
 ///         On Linux Wayland, this is a `wl_surface *`
 NativeWindowHandle :: rawptr
 
-NativeWindowPlatform :: enum i32 {
+NativeWindowPlatformIndex :: enum i32 {
 	UNKNOWN     = 0,
 	WIN32_API   = 1,
 	XLIB_API    = 2,
@@ -26,8 +26,8 @@ NativeWindowPlatform :: enum i32 {
 }
 
 SwapchainInfo :: struct {
-	native_window:                NativeWindowHandle,
-	native_window_platform:       NativeWindowPlatform,
+	native_window:                NativeWindowInfo,
+	// native_window_platform:       NativeWindowPlatformIndex,
 	surface_format_selector:      proc "c" (vk.Format) -> i32,
 	present_mode:                 vk.PresentModeKHR,
 	present_operation:            vk.SurfaceTransformFlagsKHR,
@@ -36,6 +36,29 @@ SwapchainInfo :: struct {
 	queue_family:                 QueueFamily,
 	name:                         SmallString,
 }
+
+NativeWindowInfoWin32 :: struct {
+	hwnd: rawptr,
+}
+
+NativeWindowInfoXlib :: struct{
+	window: rawptr,
+}
+
+NativeWindowInfoWayland :: struct{
+	display: rawptr,
+	surface: rawptr,
+	width:   u32,
+	height:  u32,
+}
+
+NativeWindowInfoUnion :: struct #raw_union {
+	win32L:   NativeWindowInfoWin32,
+	xlibL:    NativeWindowInfoXlib,
+	waylandL: NativeWindowInfoWayland,
+}
+
+NativeWindowInfo :: Variant(NativeWindowInfoUnion)
 
 @(default_calling_convention="c", link_prefix="daxa_")
 foreign lib {

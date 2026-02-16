@@ -216,7 +216,7 @@ MissingRequiredVkFeature :: enum i32 {
 	WIDE_LINES                                          = 7,
 	SAMPLER_ANISOTROPY                                  = 8,
 	FRAGMENT_STORES_AND_ATOMICS                         = 9,
-	SHADER_STORAGE_IMAGE_MULTISAMPLE                    = 10,
+	// SHADER_STORAGE_IMAGE_MULTISAMPLE                    = 10,
 	SHADER_STORAGE_IMAGE_READ_WITHOUT_FORMAT            = 11,
 	SHADER_STORAGE_IMAGE_WRITE_WITHOUT_FORMAT           = 12,
 	SHADER_INT64                                        = 13,
@@ -499,6 +499,12 @@ HostImageLayoutOperationInfo :: struct {
 	layout_operation: ImageLayoutOperation,
 }
 
+BufferIdOffsetPair :: struct {
+	buffer_id: BufferId,
+	offset:    u64,
+}
+
+
 @(default_calling_convention="c", link_prefix="daxa_")
 foreign lib {
 	dvc_device_memory_report                :: proc(device: Device, report: ^DeviceMemoryReport) -> Result ---
@@ -517,6 +523,12 @@ foreign lib {
 	dvc_create_blas                         :: proc(device: Device, info: ^BlasInfo, out_id: ^BlasId) -> Result ---
 	dvc_create_tlas_from_buffer             :: proc(device: Device, info: ^BufferTlasInfo, out_id: ^TlasId) -> Result ---
 	dvc_create_blas_from_buffer             :: proc(device: Device, info: ^BufferBlasInfo, out_id: ^BlasId) -> Result ---
+	dvc_inc_refcnt_buffer                   :: proc(device: Device, buffer: BufferId) -> Result ---
+	dvc_inc_refcnt_image                    :: proc(device: Device, image: ImageId) -> Result ---
+	dvc_inc_refcnt_image_view               :: proc(device: Device, id: ImageViewId) -> Result ---
+	dvc_inc_refcnt_sampler                  :: proc(device: Device, sampler: SamplerId) -> Result ---
+	dvc_inc_refcnt_tlas                     :: proc(device: Device, tlas: TlasId) -> Result ---
+	dvc_inc_refcnt_blas                     :: proc(device: Device, blas: BlasId) -> Result ---
 	dvc_destroy_buffer                      :: proc(device: Device, buffer: BufferId) -> Result ---
 	dvc_destroy_image                       :: proc(device: Device, image: ImageId) -> Result ---
 	dvc_destroy_image_view                  :: proc(device: Device, id: ImageViewId) -> Result ---
@@ -545,6 +557,9 @@ foreign lib {
 	dvc_buffer_host_address                 :: proc(device: Device, buffer: BufferId, out_addr: ^rawptr) -> Result ---
 	dvc_tlas_device_address                 :: proc(device: Device, tlas: TlasId, out_addr: ^DeviceAddress) -> Result ---
 	dvc_blas_device_address                 :: proc(device: Device, blas: BlasId, out_addr: ^DeviceAddress) -> Result ---
+
+	dvc_buffer_device_address_to_buffer     :: proc(device: Device, address: DeviceAddress, out_buffer_id_offset_pair: ^BufferIdOffsetPair) -> Result ---
+
 	dvc_create_raster_pipeline              :: proc(device: Device, info: ^RasterPipelineInfo, out_pipeline: ^RasterPipeline) -> Result ---
 	dvc_create_compute_pipeline             :: proc(device: Device, info: ^ComputePipelineInfo, out_pipeline: ^ComputePipeline) -> Result ---
 	dvc_create_ray_tracing_pipeline         :: proc(device: Device, info: ^RayTracingPipelineInfo, out_pipeline: ^RayTracingPipeline) -> Result ---

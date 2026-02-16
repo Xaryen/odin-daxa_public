@@ -39,14 +39,15 @@ result :: proc(res: daxa.Result, loc := #caller_location, exp := #caller_express
 	log.debug(res, loc, exp)
 }
 
-get_native_handle :: proc() -> daxa.NativeWindowHandle {
-	return glfw.GetWin32Window(ctx.window)
-}
+get_native_handle :: proc() -> daxa.NativeWindowInfo {
+	res: daxa.NativeWindowInfo
 
-get_native_platform :: proc() -> daxa.NativeWindowPlatform {
-	switch glfw.GetPlatform() {
-	case glfw.PLATFORM_WIN32: return daxa.NativeWindowPlatform.WIN32_API
-	case: panic("Unsupported Platform.")
+	#partial switch ODIN_OS {
+	case .Windows: 
+		res.values.win32L.hwnd = glfw.GetWin32Window(ctx.window)
+		res.index = 0
+		return res
+	case: unimplemented()
 	}
 }
 
@@ -92,7 +93,6 @@ main :: proc() {
 
 	swapchaininfo := daxa.SwapchainInfo{
 		native_window           = get_native_handle(),
-		native_window_platform  = get_native_platform(),
 		surface_format_selector = proc "c" (format: vk.Format) -> i32 {
 			#partial switch format {
 			case .R8G8B8A8_UNORM: return 100
