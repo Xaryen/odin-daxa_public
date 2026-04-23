@@ -24,7 +24,7 @@ ImageLayoutOperation :: enum i32 {
 ImageBarrierInfo :: struct {
 	src_access:       Access,
 	dst_access:       Access,
-	image_id:         ImageId,
+	image:            ImageId,
 	layout_operation: ImageLayoutOperation,
 }
 
@@ -89,7 +89,7 @@ ACCESS_HOST_WRITE :: Access{stages = {.HOST}, access_type = {.MEMORY_WRITE}}
 ACCESS_TRANSFER_WRITE :: Access{stages = {.TRANSFER}, access_type = {.MEMORY_WRITE}}
 
 ACCESS_TOP_OF_PIPE_READ            :: Access{stages = {.TOP_OF_PIPE},                       access_type = {.MEMORY_READ}}
-ACCESS_DRAW_INDIRECT_READ          :: Access{stages = {.DRAW_INDIRECT},                     access_type = {.MEMORY_READ}}
+ACCESS_INDIRECT_COMMAND_READ       :: Access{stages = {.DRAW_INDIRECT},                     access_type = {.MEMORY_READ}}
 ACCESS_VERTEX_SHADER_READ          :: Access{stages = {.VERTEX_SHADER},                     access_type = {.MEMORY_READ}}
 ACCESS_TESSELLATION_CONTROL_SHADER_READ :: Access{stages = {.TESSELLATION_CONTROL_SHADER}, access_type = {.MEMORY_READ}}
 ACCESS_TESSELLATION_EVALUATION_SHADER_READ :: Access{stages = {.TESSELLATION_EVALUATION_SHADER}, access_type = {.MEMORY_READ}}
@@ -101,7 +101,7 @@ ACCESS_COLOR_ATTACHMENT_OUTPUT_READ :: Access{stages = {.COLOR_ATTACHMENT_OUTPUT
 ACCESS_COMPUTE_SHADER_READ         :: Access{stages = {.COMPUTE_SHADER},                    access_type = {.MEMORY_READ}}
 ACCESS_BOTTOM_OF_PIPE_READ         :: Access{stages = {.BOTTOM_OF_PIPE},                    access_type = {.MEMORY_READ}}
 ACCESS_HOST_READ                   :: Access{stages = {.HOST},                              access_type = {.MEMORY_READ}}
-ACCESS_ALL_GRAPHICS_READ           :: Access{stages = {.ALL_GRAPHICS},                      access_type = {.MEMORY_READ}}
+ACCESS_ALL_RASTER_READ             :: Access{stages = {.ALL_GRAPHICS},                      access_type = {.MEMORY_READ}}
 ACCESS_READ                        :: Access{stages = {.ALL_COMMANDS},                      access_type = {.MEMORY_READ}}
 ACCESS_COPY_READ                   :: Access{stages = {.COPY},                              access_type = {.MEMORY_READ}}
 ACCESS_RESOLVE_READ                :: Access{stages = {.RESOLVE},                           access_type = {.MEMORY_READ}}
@@ -116,7 +116,6 @@ ACCESS_ACCELERATION_STRUCTURE_BUILD_READ :: Access{stages = {.ACCELERATION_STRUC
 ACCESS_RAY_TRACING_SHADER_READ     :: Access{stages = {.RAY_TRACING_SHADER_KHR},                access_type = {.MEMORY_READ}}
 
 ACCESS_TOP_OF_PIPE_WRITE           :: Access{stages = {.TOP_OF_PIPE},                       access_type = {.MEMORY_WRITE}}
-ACCESS_DRAW_INDIRECT_WRITE         :: Access{stages = {.DRAW_INDIRECT},                     access_type = {.MEMORY_WRITE}}
 ACCESS_VERTEX_SHADER_WRITE         :: Access{stages = {.VERTEX_SHADER},                     access_type = {.MEMORY_WRITE}}
 ACCESS_TESSELLATION_CONTROL_SHADER_WRITE :: Access{stages = {.TESSELLATION_CONTROL_SHADER}, access_type = {.MEMORY_WRITE}}
 ACCESS_TESSELLATION_EVALUATION_SHADER_WRITE :: Access{stages = {.TESSELLATION_EVALUATION_SHADER}, access_type = {.MEMORY_WRITE}}
@@ -127,7 +126,7 @@ ACCESS_LATE_FRAGMENT_TESTS_WRITE   :: Access{stages = {.LATE_FRAGMENT_TESTS},   
 ACCESS_COLOR_ATTACHMENT_OUTPUT_WRITE :: Access{stages = {.COLOR_ATTACHMENT_OUTPUT},         access_type = {.MEMORY_WRITE}}
 ACCESS_COMPUTE_SHADER_WRITE        :: Access{stages = {.COMPUTE_SHADER},                    access_type = {.MEMORY_WRITE}}
 ACCESS_BOTTOM_OF_PIPE_WRITE        :: Access{stages = {.BOTTOM_OF_PIPE},                    access_type = {.MEMORY_WRITE}}
-ACCESS_ALL_GRAPHICS_WRITE          :: Access{stages = {.ALL_GRAPHICS},                      access_type = {.MEMORY_WRITE}}
+ACCESS_ALL_RASTER_WRITE            :: Access{stages = {.ALL_GRAPHICS},                      access_type = {.MEMORY_WRITE}}
 ACCESS_WRITE                       :: Access{stages = {.ALL_COMMANDS},                      access_type = {.MEMORY_WRITE}}
 ACCESS_COPY_WRITE                  :: Access{stages = {.COPY},                              access_type = {.MEMORY_WRITE}}
 ACCESS_RESOLVE_WRITE               :: Access{stages = {.RESOLVE},                           access_type = {.MEMORY_WRITE}}
@@ -142,7 +141,6 @@ ACCESS_ACCELERATION_STRUCTURE_BUILD_WRITE :: Access{stages = {.ACCELERATION_STRU
 ACCESS_RAY_TRACING_SHADER_WRITE    :: Access{stages = {.RAY_TRACING_SHADER_KHR},                access_type = {.MEMORY_WRITE}}
 
 ACCESS_TOP_OF_PIPE_READ_WRITE      :: Access{stages = {.TOP_OF_PIPE},                       access_type = {.MEMORY_READ, .MEMORY_WRITE}}
-ACCESS_DRAW_INDIRECT_READ_WRITE    :: Access{stages = {.DRAW_INDIRECT},                     access_type = {.MEMORY_READ, .MEMORY_WRITE}}
 ACCESS_VERTEX_SHADER_READ_WRITE    :: Access{stages = {.VERTEX_SHADER},                     access_type = {.MEMORY_READ, .MEMORY_WRITE}}
 ACCESS_TESSELLATION_CONTROL_SHADER_READ_WRITE :: Access{stages = {.TESSELLATION_CONTROL_SHADER}, access_type = {.MEMORY_READ, .MEMORY_WRITE}}
 ACCESS_TESSELLATION_EVALUATION_SHADER_READ_WRITE :: Access{stages = {.TESSELLATION_EVALUATION_SHADER}, access_type = {.MEMORY_READ, .MEMORY_WRITE}}
@@ -155,7 +153,7 @@ ACCESS_COMPUTE_SHADER_READ_WRITE   :: Access{stages = {.COMPUTE_SHADER},        
 ACCESS_TRANSFER_READ_WRITE         :: Access{stages = {.TRANSFER},                          access_type = {.MEMORY_READ, .MEMORY_WRITE}}
 ACCESS_BOTTOM_OF_PIPE_READ_WRITE   :: Access{stages = {.BOTTOM_OF_PIPE},                    access_type = {.MEMORY_READ, .MEMORY_WRITE}}
 ACCESS_HOST_READ_WRITE             :: Access{stages = {.HOST},                              access_type = {.MEMORY_READ, .MEMORY_WRITE}}
-ACCESS_ALL_GRAPHICS_READ_WRITE     :: Access{stages = {.ALL_GRAPHICS},                      access_type = {.MEMORY_READ, .MEMORY_WRITE}}
+ACCESS_ALL_RASTER_READ_WRITE       :: Access{stages = {.ALL_GRAPHICS},                      access_type = {.MEMORY_READ, .MEMORY_WRITE}}
 ACCESS_READ_WRITE                  :: Access{stages = {.ALL_COMMANDS},                      access_type = {.MEMORY_READ, .MEMORY_WRITE}}
 ACCESS_COPY_READ_WRITE             :: Access{stages = {.COPY},                              access_type = {.MEMORY_READ, .MEMORY_WRITE}}
 ACCESS_RESOLVE_READ_WRITE          :: Access{stages = {.RESOLVE},                           access_type = {.MEMORY_READ, .MEMORY_WRITE}}

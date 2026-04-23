@@ -6,6 +6,8 @@ import "core:slice"
 import "core:fmt"
 import "core:log"
 import "core:bytes"
+import "core:math"
+import "core:math/linalg"
 import "vendor:glfw"
 
 import vk "vendor:vulkan"
@@ -43,9 +45,9 @@ get_native_handle :: proc() -> daxa.NativeWindowInfo {
 	res: daxa.NativeWindowInfo
 
 	#partial switch ODIN_OS {
-	case .Windows: 
-		res.values.win32L.hwnd = glfw.GetWin32Window(ctx.window)
-		res.index = 0
+	case .Windows:
+		res.values.win32.hwnd = glfw.GetWin32Window(ctx.window)
+		res.index = u8(daxa.NativeWindowPlatformIndex.WIN32)
 		return res
 	case: unimplemented()
 	}
@@ -91,14 +93,26 @@ main :: proc() {
 	log.infof("%s", bytes.trim_null(test_props.device_name[:]))
 
 
+	native_window := get_native_handle()
+
+	preferred_formats := [?]vk.SurfaceFormatKHR{
+		{format = .R8G8B8A8_UNORM, colorSpace = vk.ColorSpaceKHR(max(i32))},
+	}
+	choose_info := daxa.ChooseSwapchainSurfaceFormatInfo{
+		native_window_info = native_window,
+		preferred_formats  = {data = raw_data(preferred_formats[:]), size = len(preferred_formats)},
+	}
+	surface_format: vk.SurfaceFormatKHR
+	res := daxa.dvc_choose_swapchain_surface_format(ctx.device, &choose_info, &surface_format)
+	if res == .NO_SUITABLE_FORMAT_FOUND {
+		choose_info.preferred_formats = {}
+		res = daxa.dvc_choose_swapchain_surface_format(ctx.device, &choose_info, &surface_format)
+	}
+	result(res)
+
 	swapchaininfo := daxa.SwapchainInfo{
-		native_window           = get_native_handle(),
-		surface_format_selector = proc "c" (format: vk.Format) -> i32 {
-			#partial switch format {
-			case .R8G8B8A8_UNORM: return 100
-			case: return daxa.default_format_selector(format)
-			}
-		},
+		native_window                = native_window,
+		surface_format               = surface_format,
 		present_mode                 = .FIFO,
 		present_operation            = {.IDENTITY},
 		image_usage                  = {.TRANSFER_DST},
@@ -123,7 +137,9 @@ main :: proc() {
 	
 	async_queues_basics()
 	async_queues_simple_submit_chain()
-	async_queues_mesh_shader_test()
+	async_queues_submit_index()
+
+	sokol_cube()
 
 	result(daxa.dvc_wait_idle(ctx.device))
 	result(daxa.dvc_collect_garbage(ctx.device))
@@ -220,7 +236,7 @@ compute_triangle :: proc() {
 			cmd_enc = recorder,
 			info = &{
 				dst_access = daxa.ACCESS_COMPUTE_SHADER_READ_WRITE,
-				image_id   = render_image,
+				image      = render_image,
 				layout_operation = .TO_GENERAL,
 			},
 		))
@@ -256,7 +272,7 @@ compute_triangle :: proc() {
 			cmd_enc = recorder,
 			info = &{
 				dst_access = daxa.ACCESS_BLIT_READ,
-				image_id   = render_image,
+				image      = render_image,
 				layout_operation = .TO_GENERAL,
 			},
 		))
@@ -265,7 +281,7 @@ compute_triangle :: proc() {
 			cmd_enc = recorder,
 			info = &{
 				dst_access = daxa.ACCESS_BLIT_WRITE,
-				image_id   = swapchain_image,
+				image      = swapchain_image,
 				layout_operation = .TO_GENERAL,
 			},
 		))
@@ -273,15 +289,13 @@ compute_triangle :: proc() {
 		result(daxa.cmd_blit_image_to_image(
 			cmd_enc = recorder,
 			info = &{
-				src_image        = render_image,
-				src_image_layout = .GENERAL,
-				dst_image        = swapchain_image,
-				dst_image_layout = .GENERAL,
-				src_slice        = daxa.DEFAULT_IMAGE_ARRAY_SLICE,
-				dst_slice        = daxa.DEFAULT_IMAGE_ARRAY_SLICE,
-				src_offsets      = {{0, 0, 0}, { i32(size_x), i32(size_y), 1 } },
-				dst_offsets      = {{0, 0, 0}, { i32(size_x), i32(size_y), 1 } },
-				filter           = .NEAREST,
+				src_image   = render_image,
+				dst_image   = swapchain_image,
+				src_slice   = daxa.DEFAULT_IMAGE_ARRAY_SLICE,
+				dst_slice   = daxa.DEFAULT_IMAGE_ARRAY_SLICE,
+				src_offsets = {{0, 0, 0}, { i32(size_x), i32(size_y), 1 } },
+				dst_offsets = {{0, 0, 0}, { i32(size_x), i32(size_y), 1 } },
+				filter      = .NEAREST,
 			}
 		))
 
@@ -289,7 +303,7 @@ compute_triangle :: proc() {
 			cmd_enc = recorder,
 			info = &{
 				src_access = daxa.ACCESS_BLIT_WRITE,
-				image_id   = swapchain_image,
+				image      = swapchain_image,
 				layout_operation = .TO_PRESENT_SRC,
 			}
 		))
@@ -309,7 +323,7 @@ compute_triangle :: proc() {
 		}
 
 		timeline_pair := current_timeline_pair()
-		result(daxa.dvc_submit(
+		result(daxa.dvc_submit_commands(
 			device = ctx.device,
 			info = &{
 				command_lists = &executable_commands,
@@ -326,7 +340,7 @@ compute_triangle :: proc() {
 
 		daxa.executable_commands_dec_refcnt(executable_commands)
 
-		result(daxa.dvc_present(
+		result(daxa.dvc_present_frame(
 			device = ctx.device,
 			info = &{
 				wait_binary_semaphores      = present_semaphore,
@@ -399,7 +413,7 @@ triangle :: proc() {
 		device = ctx.device,
 		info = &{
 			size = size_of(MyVertex) * 3,
-			allocate_info = {.HOST_ACCESS_SEQUENTIAL_WRITE},
+			memory_flags = {.HOST_ACCESS_SEQUENTIAL_WRITE},
 			name = small_string("vertex buffer",)
 		},
 		out_id = &vertex_buffer,
@@ -463,7 +477,7 @@ triangle :: proc() {
 			cmd_enc = recorder,
 			info = &{
 				dst_access = daxa.ACCESS_COLOR_ATTACHMENT_OUTPUT_READ_WRITE,
-				image_id   = swapchain_image,
+				image      = swapchain_image,
 				layout_operation = .TO_GENERAL,
 			},
 		)
@@ -519,7 +533,7 @@ triangle :: proc() {
 			cmd_enc = recorder,
 			info = &{
 				src_access = daxa.ACCESS_COLOR_ATTACHMENT_OUTPUT_READ_WRITE,
-				image_id   = swapchain_image,
+				image      = swapchain_image,
 				layout_operation = .TO_PRESENT_SRC,
 			}
 		)
@@ -540,7 +554,7 @@ triangle :: proc() {
 		}
 
 		timeline_pair := current_timeline_pair()
-		result(daxa.dvc_submit(
+		result(daxa.dvc_submit_commands(
 			device = ctx.device,
 			info = &{
 				command_lists = &executable_commands,
@@ -557,7 +571,7 @@ triangle :: proc() {
 
 		daxa.executable_commands_dec_refcnt(executable_commands)
 
-		result(daxa.dvc_present(
+		result(daxa.dvc_present_frame(
 			device = ctx.device,
 			info = &{
 				wait_binary_semaphores      = present_semaphore,
@@ -615,7 +629,7 @@ pink_screen :: proc() {
 			cmd_enc = recorder,
 			info    = &{
 				dst_access       = daxa.ACCESS_TRANSFER_WRITE,
-				image_id         = swapchain_image,
+				image            = swapchain_image,
 				layout_operation = .TO_GENERAL,
 			}
 		))
@@ -623,13 +637,12 @@ pink_screen :: proc() {
 		result(daxa.cmd_clear_image(
 			cmd_enc = recorder,
 			info    = &{
-				image_layout = .GENERAL,
+				image = swapchain_image,
+				slice = swapchain_image_info.slice,
 				clear_value = {
 					values = { color = { float32 = ([4]f32{1, 0, 1, 1})}},
 					index = 0,
 				},
-				image     = swapchain_image,
-				dst_slice = swapchain_image_info.slice,
 			}
 		))
 
@@ -637,7 +650,7 @@ pink_screen :: proc() {
 			cmd_enc = recorder,
 			info = &{
 				src_access       = daxa.ACCESS_TRANSFER_WRITE,
-				image_id         = swapchain_image,
+				image            = swapchain_image,
 				layout_operation = .TO_PRESENT_SRC,
 			}
 		))
@@ -657,7 +670,7 @@ pink_screen :: proc() {
 		}
 
 		timeline_pair := current_timeline_pair()
-		result(daxa.dvc_submit(
+		result(daxa.dvc_submit_commands(
 			device = ctx.device,
 			info = &{
 				command_lists = &executable_commands,
@@ -674,7 +687,7 @@ pink_screen :: proc() {
 
 		daxa.executable_commands_dec_refcnt(executable_commands)
 
-		result(daxa.dvc_present(
+		result(daxa.dvc_present_frame(
 			device = ctx.device,
 			info = &{
 				wait_binary_semaphores      = present_semaphore,
@@ -710,7 +723,7 @@ cmd_simplest_test :: proc() {
 
 	
 
-	daxa.dvc_submit(
+	daxa.dvc_submit_commands(
 		ctx.device,
 		info = &{ command_lists = &executable_commands, },
 		out_submit_index = nil,
@@ -799,7 +812,7 @@ cmd_copy_test :: proc() {
 	result(daxa.dvc_create_buffer(
 		ctx.device,
 		&{size = size_of(data),
-			allocate_info = {.HOST_ACCESS_SEQUENTIAL_WRITE},
+			memory_flags = {.HOST_ACCESS_SEQUENTIAL_WRITE},
 			name = small_string("staging_upload_buffer"),
 		},
 		&staging_upload_buffer,
@@ -818,7 +831,7 @@ cmd_copy_test :: proc() {
 	result(daxa.dvc_create_buffer(
 		ctx.device,
 		&{size = size_of(data),
-			allocate_info = {.HOST_ACCESS_RANDOM},
+			memory_flags = {.HOST_ACCESS_RANDOM},
 			name = small_string("staging_readback_buffer"),
 		},
 		&staging_readback_buffer,
@@ -921,13 +934,13 @@ cmd_copy_test :: proc() {
 		info = &{
 		src_access = daxa.ACCESS_TRANSFER_WRITE,
 		dst_access = daxa.ACCESS_TRANSFER_WRITE,
-		image_id = image_1,
+		image = image_1,
 		layout_operation = .TO_GENERAL,
 	})
 
 	bi_info := daxa.DEFAULT_BUFFER_IMAGE_COPY_INFO
-	bi_info.buffer = device_local_buffer
-	bi_info.image = image_1
+	bi_info.src_buffer = device_local_buffer
+	bi_info.dst_image = image_1
 	bi_info.image_extent = {SIZE_X, SIZE_Y, SIZE_Z}
 	daxa.cmd_copy_buffer_to_image(
 		cmd_enc = recorder,
@@ -939,7 +952,7 @@ cmd_copy_test :: proc() {
 		info = &{
 		src_access = daxa.ACCESS_TRANSFER_WRITE,
 		dst_access = daxa.ACCESS_TRANSFER_READ,
-		image_id = image_1,
+		image = image_1,
 		layout_operation = .TO_GENERAL,
 	})
 
@@ -947,7 +960,7 @@ cmd_copy_test :: proc() {
 		cmd_enc = recorder,
 		info = &{
 		dst_access = daxa.ACCESS_TRANSFER_WRITE,
-		image_id = image_2,
+		image = image_2,
 		layout_operation = .TO_GENERAL,
 	})
 
@@ -965,7 +978,7 @@ cmd_copy_test :: proc() {
 		info = &{
 		src_access = daxa.ACCESS_TRANSFER_WRITE,
 		dst_access = daxa.ACCESS_TRANSFER_READ,
-		image_id = image_2,
+		image = image_2,
 		layout_operation = .TO_GENERAL,
 	})
 
@@ -978,9 +991,9 @@ cmd_copy_test :: proc() {
 	})
 
 	ib_info := daxa.DEFAULT_IMAGE_BUFFER_COPY_INFO
-	ib_info.image = image_2
+	ib_info.src_image = image_2
 	ib_info.image_extent = {SIZE_X, SIZE_Y, SIZE_Z}
-	ib_info.buffer = device_local_buffer
+	ib_info.dst_buffer = device_local_buffer
 	daxa.cmd_copy_image_to_buffer(
 		cmd_enc = recorder,
 		info = &ib_info,
@@ -1026,7 +1039,7 @@ cmd_copy_test :: proc() {
 	result(daxa.cmd_complete_current_commands(recorder, &executable_commands))
 
 	
-	result(daxa.dvc_submit(
+	result(daxa.dvc_submit_commands(
 		ctx.device,
 		&{
 			command_lists = &executable_commands,
@@ -1115,16 +1128,16 @@ cmd_deferred_destruction_test :: proc() {
 	result(daxa.cmd_complete_current_commands(recorder, &executable_commands))
 
 	// Even after this call the resources will still be alive, as zombie resources are not checked to be dead in submit calls.
-	result(daxa.dvc_submit(ctx.device, &{command_lists = &executable_commands, command_list_count = 1,}, out_submit_index = nil,))
+	result(daxa.dvc_submit_commands(ctx.device, &{command_lists = &executable_commands, command_list_count = 1,}, out_submit_index = nil,))
 }
 
 cmd_multiple_ecl_test :: proc() {
 	buf_a: daxa.BufferId
-	result(daxa.dvc_create_buffer(ctx.device, &{size = 4, allocate_info = {.HOST_ACCESS_SEQUENTIAL_WRITE}, name = small_string("buf_a")}, out_id = &buf_a))
+	result(daxa.dvc_create_buffer(ctx.device, &{size = 4, memory_flags = {.HOST_ACCESS_SEQUENTIAL_WRITE}, name = small_string("buf_a")}, out_id = &buf_a))
 	buf_b: daxa.BufferId
 	result(daxa.dvc_create_buffer(ctx.device, &{size = 4, name = small_string("buf_b")}, out_id = &buf_b))
 	buf_c: daxa.BufferId
-	result(daxa.dvc_create_buffer(ctx.device, &{size = 4, allocate_info = {.HOST_ACCESS_RANDOM}, name = small_string("buf_c")}, out_id = &buf_c))
+	result(daxa.dvc_create_buffer(ctx.device, &{size = 4, memory_flags = {.HOST_ACCESS_RANDOM}, name = small_string("buf_c")}, out_id = &buf_c))
 	
 	TEST_VALUE :: 0xf0abf0ab 
 
@@ -1176,7 +1189,7 @@ cmd_multiple_ecl_test :: proc() {
 	))
 
 
-	result(daxa.dvc_submit(
+	result(daxa.dvc_submit_commands(
 		ctx.device,
 		&{
 			command_lists = &executable_commands_0,
@@ -1187,10 +1200,9 @@ cmd_multiple_ecl_test :: proc() {
 		out_submit_index = nil,
 	))
 
-	result(daxa.dvc_submit(
+	result(daxa.dvc_submit_commands(
 		ctx.device,
 		&{
-			wait_stages = {.TRANSFER},
 			command_lists = &executable_commands_1,
 			command_list_count = 1,
 			wait_binary_semaphores = &sema,
@@ -1223,6 +1235,41 @@ cmd_multiple_ecl_test :: proc() {
 	result(daxa.dvc_collect_garbage(ctx.device))
 }
 
+test_matrix_layout :: proc() {
+
+	// daxa matrices are row major!
+	daxa_matrix := daxa.f32mat4x3{
+		{4, 5, 6},
+		{3, 4, 5},
+		{2, 3, 4},
+		{1, 2, 3},
+	}
+
+	odin_matrix_col := matrix[4, 3]f32{
+		4, 5, 6,
+		3, 4, 5,
+		2, 3, 4,
+		1, 2, 3,
+	}
+
+	odin_matrix_row := #row_major matrix[4, 3]f32{
+		4, 5, 6,
+		3, 4, 5,
+		2, 3, 4,
+		1, 2, 3,
+	}
+
+	odin_matrix_col_bytes := transmute([12]f32)odin_matrix_col
+	odin_matrix_row_bytes := transmute([12]f32)odin_matrix_row
+	daxa_matrix_bytes     := transmute([12]f32)daxa_matrix
+	fmt.println(odin_matrix_col_bytes)
+	fmt.println(odin_matrix_row_bytes)
+	fmt.println(daxa_matrix_bytes)
+
+	assert(odin_matrix_col_bytes != daxa_matrix_bytes) 
+	assert(odin_matrix_row_bytes == daxa_matrix_bytes) 
+}
+
 cmd_build_acceleration_structure_test :: proc(){
 	
 	vertices := [?]f32{
@@ -1235,7 +1282,7 @@ cmd_build_acceleration_structure_test :: proc(){
 		ctx.device,
 		&{
 			size = size_of(vertices),
-			allocate_info = {.HOST_ACCESS_RANDOM},
+			memory_flags = {.HOST_ACCESS_RANDOM},
 			name = small_string("vertex buffer")
 		},
 		out_id = &vertex_buffer
@@ -1251,7 +1298,7 @@ cmd_build_acceleration_structure_test :: proc(){
 		ctx.device,
 		&{
 			size = size_of(indices),
-			allocate_info = {.HOST_ACCESS_RANDOM},
+			memory_flags = {.HOST_ACCESS_RANDOM},
 			name = small_string("vertex buffer"),
 		},
 		out_id = &index_buffer,
@@ -1271,7 +1318,7 @@ cmd_build_acceleration_structure_test :: proc(){
 		ctx.device,
 		&{
 			size = size_of(transform),
-			allocate_info = {.HOST_ACCESS_RANDOM},
+			memory_flags = {.HOST_ACCESS_RANDOM},
 			name = small_string("transform buffer"),
 		},
 		out_id = &transform_buffer,
@@ -1361,7 +1408,7 @@ cmd_build_acceleration_structure_test :: proc(){
 	executable_commands: daxa.ExecutableCommandList
 	result(daxa.cmd_complete_current_commands(recorder, &executable_commands))
 	
-	result(daxa.dvc_submit(
+	result(daxa.dvc_submit_commands(
 		ctx.device,
 		&{
 			command_lists = &executable_commands,
@@ -1411,7 +1458,7 @@ async_queues_simple_submit_chain :: proc() {
 		device = ctx.device,
 		info = &{
 			size = size_of([4]u32),
-			allocate_info = {.HOST_ACCESS_RANDOM},
+			memory_flags = {.HOST_ACCESS_RANDOM},
 			name = small_string("buffer"),
 		},
 		out_id = &buffer,
@@ -1427,9 +1474,9 @@ async_queues_simple_submit_chain :: proc() {
 		// A generic or compute command recorder can not record commands for a transfer queue!
 		// Tho transfer command recorders CAN record commands for any queue.
 		recorder: daxa.CommandRecorder
-		result(daxa.dvc_create_command_recorder(ctx.device, &{queue_family = .TRANSFER}, &recorder))
+		result(daxa.dvc_create_command_recorder(ctx.device, &{queue_type = .TRANSFER}, &recorder))
 		daxa.cmd_pipeline_barrier(recorder, &{ daxa.ACCESS_TRANSFER_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE} )
-	
+
 		result(daxa.cmd_copy_buffer_to_buffer(
 			cmd_enc = recorder,
 			info = &{
@@ -1442,11 +1489,11 @@ async_queues_simple_submit_chain :: proc() {
 		))
 
 		daxa.cmd_pipeline_barrier( cmd_enc = recorder, info = &{ daxa.ACCESS_TRANSFER_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE })
-		
+
 		commands: daxa.ExecutableCommandList
 		result(daxa.cmd_complete_current_commands(recorder, &commands))
-		daxa.dvc_submit(
-			ctx.device, 
+		daxa.dvc_submit_commands(
+			ctx.device,
 			info = &{
 				queue = {.TRANSFER, 0},
 				command_lists = &commands,
@@ -1464,9 +1511,9 @@ async_queues_simple_submit_chain :: proc() {
 		// Commands for a compute queue can only be recorded by a compute or a transfer command recorder!
 		// A generic command recorder is not allowed to record commands for a compute queue!
 		recorder: daxa.CommandRecorder
-		result(daxa.dvc_create_command_recorder(ctx.device, &{queue_family = .COMPUTE}, &recorder))
+		result(daxa.dvc_create_command_recorder(ctx.device, &{queue_type = .COMPUTE}, &recorder))
 		daxa.cmd_pipeline_barrier(recorder, &{ daxa.ACCESS_TRANSFER_READ_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE} )
-	
+
 		result(daxa.cmd_copy_buffer_to_buffer(
 			cmd_enc = recorder,
 			info = &{
@@ -1479,11 +1526,11 @@ async_queues_simple_submit_chain :: proc() {
 		))
 
 		daxa.cmd_pipeline_barrier( cmd_enc = recorder, info = &{ daxa.ACCESS_TRANSFER_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE })
-		
+
 		commands: daxa.ExecutableCommandList
 		result(daxa.cmd_complete_current_commands(recorder, &commands))
-		daxa.dvc_submit(
-			ctx.device, 
+		daxa.dvc_submit_commands(
+			ctx.device,
 			info = &{
 				queue = {.COMPUTE, 1},
 				command_lists = &commands,
@@ -1518,11 +1565,11 @@ async_queues_simple_submit_chain :: proc() {
 		))
 
 		daxa.cmd_pipeline_barrier( cmd_enc = recorder, info = &{ daxa.ACCESS_TRANSFER_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE })
-		
+
 		commands: daxa.ExecutableCommandList
 		result(daxa.cmd_complete_current_commands(recorder, &commands))
-		daxa.dvc_submit(
-			ctx.device, 
+		daxa.dvc_submit_commands(
+			ctx.device,
 			info = &{
 				// .queue = daxa::Queue::MAIN, // The default is the main queue.
 				command_lists = &commands,
@@ -1550,41 +1597,564 @@ async_queues_simple_submit_chain :: proc() {
 	daxa.dvc_destroy_buffer(ctx.device, buffer)
 }
 
-async_queues_mesh_shader_test :: proc() {
-	
+async_queues_submit_index :: proc() {
+	initial_value := u32(42)
+
+	// Make buffer for a u32[4] array and write some data into the first element.
+	buffer: daxa.BufferId
+	result(daxa.dvc_create_buffer(
+		device = ctx.device,
+		info = &{
+			size = size_of([4]u32),
+			memory_flags = {.HOST_ACCESS_RANDOM},
+			name = small_string("buffer"),
+		},
+		out_id = &buffer,
+	))
+	defer daxa.dvc_destroy_buffer(ctx.device, buffer)
+
+	buffer_ptr: ^[4]u32
+	result(daxa.dvc_buffer_host_address(ctx.device, buffer, (^rawptr)(&buffer_ptr)))
+	buffer_ptr[0] = initial_value
+
+	// Instead of semaphores, this test uses submit indices to synchronize queues.
+	transfer_submit_index: daxa.QueueSubmitIndexPair
+
+	{
+		// Copy from index 0 to index 1 on the transfer queue.
+		// Command recorders queue type MUST match the queue it is submitted to.
+		// Commands for a transfer queue MUST ONLY be recorded by a transfer command recorder!
+		rec: daxa.CommandRecorder
+		result(daxa.dvc_create_command_recorder(ctx.device, &{queue_type = .TRANSFER}, &rec))
+
+		daxa.cmd_pipeline_barrier(rec, &{daxa.ACCESS_TRANSFER_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE})
+		result(daxa.cmd_copy_buffer_to_buffer(
+			cmd_enc = rec,
+			info = &{
+				src_buffer = buffer,
+				dst_buffer = buffer,
+				src_offset = size_of(u32) * 0,
+				dst_offset = size_of(u32) * 1,
+				size       = size_of(u32),
+			},
+		))
+		daxa.cmd_pipeline_barrier(rec, &{daxa.ACCESS_TRANSFER_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE})
+
+		commands: daxa.ExecutableCommandList
+		result(daxa.cmd_complete_current_commands(rec, &commands))
+		daxa.destroy_command_recorder(rec)
+
+		result(daxa.dvc_submit_commands(
+			ctx.device,
+			&{
+				queue              = daxa.QUEUE_TRANSFER_0,
+				command_lists      = &commands,
+				command_list_count = 1,
+			},
+			out_submit_index = nil,
+		))
+		daxa.executable_commands_dec_refcnt(commands)
+
+		transfer_submit_index.queue = daxa.QUEUE_TRANSFER_0
+		result(daxa.dvc_latest_queue_submit_index(ctx.device, daxa.QUEUE_TRANSFER_0, &transfer_submit_index.index))
+	}
+
+	comp_submit_index: daxa.QueueSubmitIndexPair
+	{
+		// Copy from index 1 to index 2 on a compute queue, waiting for the transfer via submit index.
+		// Commands for a compute queue can only be recorded by a compute or a transfer command recorder.
+		rec: daxa.CommandRecorder
+		result(daxa.dvc_create_command_recorder(ctx.device, &{queue_type = .COMPUTE}, &rec))
+
+		daxa.cmd_pipeline_barrier(rec, &{daxa.ACCESS_TRANSFER_READ_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE})
+		result(daxa.cmd_copy_buffer_to_buffer(
+			cmd_enc = rec,
+			info = &{
+				src_buffer = buffer,
+				dst_buffer = buffer,
+				src_offset = size_of(u32) * 1,
+				dst_offset = size_of(u32) * 2,
+				size       = size_of(u32),
+			},
+		))
+		daxa.cmd_pipeline_barrier(rec, &{daxa.ACCESS_TRANSFER_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE})
+
+		commands: daxa.ExecutableCommandList
+		result(daxa.cmd_complete_current_commands(rec, &commands))
+		daxa.destroy_command_recorder(rec)
+
+		result(daxa.dvc_submit_commands(
+			ctx.device,
+			&{
+				queue                           = daxa.QUEUE_COMPUTE_1,
+				command_lists                   = &commands,
+				command_list_count              = 1,
+				wait_queue_submit_indices       = &transfer_submit_index,
+				wait_queue_submit_indices_count = 1,
+			},
+			out_submit_index = nil,
+		))
+		daxa.executable_commands_dec_refcnt(commands)
+
+		comp_submit_index.queue = daxa.QUEUE_COMPUTE_1
+		result(daxa.dvc_latest_queue_submit_index(ctx.device, daxa.QUEUE_COMPUTE_1, &comp_submit_index.index))
+	}
+
+	mainq_submit_index: daxa.QueueSubmitIndexPair
+	{
+		// Copy from index 2 to index 3 on the main queue, waiting for compute via submit index.
+		rec: daxa.CommandRecorder
+		result(daxa.dvc_create_command_recorder(ctx.device, &{}, &rec))
+
+		daxa.cmd_pipeline_barrier(rec, &{daxa.ACCESS_TRANSFER_READ_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE})
+		result(daxa.cmd_copy_buffer_to_buffer(
+			cmd_enc = rec,
+			info = &{
+				src_buffer = buffer,
+				dst_buffer = buffer,
+				src_offset = size_of(u32) * 2,
+				dst_offset = size_of(u32) * 3,
+				size       = size_of(u32),
+			},
+		))
+		daxa.cmd_pipeline_barrier(rec, &{daxa.ACCESS_TRANSFER_READ_WRITE, daxa.ACCESS_TRANSFER_READ_WRITE})
+
+		commands: daxa.ExecutableCommandList
+		result(daxa.cmd_complete_current_commands(rec, &commands))
+		daxa.destroy_command_recorder(rec)
+
+		result(daxa.dvc_submit_commands(
+			ctx.device,
+			&{
+				command_lists                   = &commands,
+				command_list_count              = 1,
+				wait_queue_submit_indices       = &comp_submit_index,
+				wait_queue_submit_indices_count = 1,
+			},
+			out_submit_index = nil,
+		))
+		daxa.executable_commands_dec_refcnt(commands)
+
+		mainq_submit_index.queue = daxa.QUEUE_MAIN
+		result(daxa.dvc_latest_queue_submit_index(ctx.device, daxa.QUEUE_MAIN, &mainq_submit_index.index))
+	}
+	// The submit index waits make sure that the queues submissions are processed in the correct order (transfer0 -> comp1 -> main).
+
+	// Instead of wait idle we can perform a finer grained wait on the specific submit index of a queue:
+	result(daxa.dvc_wait_on_submit(ctx.device, {
+		queue              = mainq_submit_index.queue,
+		queue_submit_index = mainq_submit_index.index,
+		timeout            = max(u64),
+	}))
+
+	readback_ptr: ^[4]u32
+	result(daxa.dvc_buffer_host_address(ctx.device, buffer, (^rawptr)(&readback_ptr)))
+	final := readback_ptr[3]
+
+	log.info(final)
+	assert(final == initial_value, "operations resulted in incorrect final result!")
+	result(daxa.dvc_wait_idle(ctx.device))
+	result(daxa.dvc_collect_garbage(ctx.device))
 }
 
-test_matrix_layout :: proc() {
+sokol_cube :: proc() {
+	glfw.SetWindowTitle(ctx.window, "Sokol Cube!")
+	TEX3D_DIM :: 32
 
-	// daxa matrices are row major!
-	daxa_matrix := daxa.f32mat4x3{
-		{4, 5, 6},
-		{3, 4, 5},
-		{2, 3, 4},
-		{1, 2, 3},
+	vertices := [?]f32{
+		-1.0, -1.0, -1.0,    1.0, -1.0, -1.0,    1.0,  1.0, -1.0,   -1.0,  1.0, -1.0,
+		-1.0, -1.0,  1.0,    1.0, -1.0,  1.0,    1.0,  1.0,  1.0,   -1.0,  1.0,  1.0,
+		-1.0, -1.0, -1.0,   -1.0,  1.0, -1.0,   -1.0,  1.0,  1.0,   -1.0, -1.0,  1.0,
+		 1.0, -1.0, -1.0,    1.0,  1.0, -1.0,    1.0,  1.0,  1.0,    1.0, -1.0,  1.0,
+		-1.0, -1.0, -1.0,   -1.0, -1.0,  1.0,    1.0, -1.0,  1.0,    1.0, -1.0, -1.0,
+		-1.0,  1.0, -1.0,   -1.0,  1.0,  1.0,    1.0,  1.0,  1.0,    1.0,  1.0, -1.0,
 	}
 
-	odin_matrix_col := matrix[4, 3]f32{
-		4, 5, 6,
-		3, 4, 5,
-		2, 3, 4,
-		1, 2, 3,
+	indices := [?]u16{
+		0, 1, 2,     0, 2, 3,
+		6, 5, 4,     7, 6, 4,
+		8, 9, 10,    8, 10, 11,
+		14, 13, 12,  15, 14, 12,
+		16, 17, 18,  16, 18, 19,
+		22, 21, 20,  23, 22, 20
 	}
 
-	odin_matrix_row := #row_major matrix[4, 3]f32{
-		4, 5, 6,
-		3, 4, 5,
-		2, 3, 4,
-		1, 2, 3,
+	vertex_buffer: daxa.BufferId
+	result(daxa.dvc_create_buffer(
+		device = ctx.device,
+		info = &{
+			size         = size_of(vertices),
+			memory_flags = {.HOST_ACCESS_SEQUENTIAL_WRITE},
+			name         = small_string("vertex_buffer"),
+		},
+		out_id = &vertex_buffer,
+	))
+	defer daxa.dvc_destroy_buffer(ctx.device, vertex_buffer)
+
+	vbo_mapped: ^[len(vertices)]f32
+	result(daxa.dvc_buffer_host_address(ctx.device, vertex_buffer, (^rawptr)(&vbo_mapped)))
+	vbo_mapped^ = vertices
+
+	vbo_addr: daxa.DeviceAddress
+	result(daxa.dvc_buffer_device_address(ctx.device, vertex_buffer, &vbo_addr))
+
+	index_buffer: daxa.BufferId
+	result(daxa.dvc_create_buffer(
+		device = ctx.device,
+		info = &{
+			size         = size_of(indices),
+			memory_flags = {.HOST_ACCESS_SEQUENTIAL_WRITE},
+			name         = small_string("index_buffer"),
+		},
+		out_id = &index_buffer,
+	))
+	defer daxa.dvc_destroy_buffer(ctx.device, index_buffer)
+
+	ibo_mapped: ^[len(indices)]u16
+	result(daxa.dvc_buffer_host_address(ctx.device, index_buffer, (^rawptr)(&ibo_mapped)))
+	ibo_mapped^ = indices
+
+	xorshift32 :: proc() -> u32 {
+		@static x := u32(0x12345678)
+		x ~= x<<13
+		x ~= x>>17
+		x ~= x<<5
+		return x
 	}
 
-	odin_matrix_col_bytes := transmute([12]f32)odin_matrix_col
-	odin_matrix_row_bytes := transmute([12]f32)odin_matrix_row
-	daxa_matrix_bytes     := transmute([12]f32)daxa_matrix
-	fmt.println(odin_matrix_col_bytes)
-	fmt.println(odin_matrix_row_bytes)
-	fmt.println(daxa_matrix_bytes)
+	pixels: [TEX3D_DIM][TEX3D_DIM][TEX3D_DIM]u32
+	for x in 0..<TEX3D_DIM {
+		for y in 0..<TEX3D_DIM {
+			for z in 0..<TEX3D_DIM {
+				pixels[x][y][z] = xorshift32()
+			}
+		}
+	}
 
-	assert(odin_matrix_col_bytes != daxa_matrix_bytes) 
-	assert(odin_matrix_row_bytes == daxa_matrix_bytes) 
+	image: daxa.ImageId
+	image_info := daxa.DEFAULT_IMAGE_INFO
+	image_info.dimensions = 3
+	image_info.format     = .R8G8B8A8_UNORM
+	image_info.size       = {TEX3D_DIM, TEX3D_DIM, TEX3D_DIM}
+	image_info.usage      = {.TRANSFER_DST, .SHADER_SAMPLED}
+	image_info.name       = small_string("pixels")
+	result(daxa.dvc_create_image(ctx.device, &image_info, &image))
+	defer daxa.dvc_destroy_image(ctx.device, image)
+
+	pix_slice := transmute([TEX3D_DIM*TEX3D_DIM*TEX3D_DIM]u32)pixels
+
+	staging_buffer: daxa.BufferId
+	result(daxa.dvc_create_buffer(
+		device = ctx.device,
+		info = &{
+			size         = size_of(pix_slice),
+			memory_flags = {.HOST_ACCESS_SEQUENTIAL_WRITE},
+			name         = small_string("staging_buffer"),
+		},
+		out_id = &staging_buffer,
+	))
+	defer daxa.dvc_destroy_buffer(ctx.device, staging_buffer)
+
+	staging_mapped: ^[TEX3D_DIM*TEX3D_DIM*TEX3D_DIM]u32
+	result(daxa.dvc_buffer_host_address(ctx.device, staging_buffer, (^rawptr)(&staging_mapped)))
+	staging_mapped^ = pix_slice
+
+	{
+		temp_recorder: daxa.CommandRecorder
+		result(daxa.dvc_create_command_recorder(ctx.device, &{name = small_string("tex upload")}, &temp_recorder))
+
+		result(daxa.cmd_pipeline_image_barrier(
+			cmd_enc = temp_recorder,
+			info = &{
+				src_access       = daxa.ACCESS_TRANSFER_WRITE,
+				dst_access       = daxa.ACCESS_TRANSFER_WRITE,
+				image            = image,
+				layout_operation = .TO_GENERAL,
+			},
+		))
+
+		copy_info := daxa.DEFAULT_BUFFER_IMAGE_COPY_INFO
+		copy_info.src_buffer   = staging_buffer
+		copy_info.dst_image    = image
+		copy_info.image_extent = {TEX3D_DIM, TEX3D_DIM, TEX3D_DIM}
+		result(daxa.cmd_copy_buffer_to_image(cmd_enc = temp_recorder, info = &copy_info))
+
+		upload_commands: daxa.ExecutableCommandList
+		result(daxa.cmd_complete_current_commands(temp_recorder, &upload_commands))
+		daxa.destroy_command_recorder(temp_recorder)
+
+		result(daxa.dvc_submit_commands(
+			ctx.device,
+			&{command_lists = &upload_commands, command_list_count = 1},
+			out_submit_index = nil,
+		))
+		daxa.executable_commands_dec_refcnt(upload_commands)
+		result(daxa.dvc_wait_idle(ctx.device))
+	}
+
+	image_view: daxa.ImageViewId
+	image_view_info := daxa.DEFAULT_IMAGE_VIEW_INFO
+	image_view_info.type   = .D3
+	image_view_info.format = .R8G8B8A8_UNORM
+	image_view_info.image  = image
+	image_view_info.name   = small_string("texture")
+	result(daxa.dvc_create_image_view(ctx.device, &image_view_info, &image_view))
+	defer daxa.dvc_destroy_image_view(ctx.device, image_view)
+
+	sampler: daxa.SamplerId
+	sampler_info := daxa.DEFAULT_SAMPLER_INFO
+	sampler_info.magnification_filter = .LINEAR
+	sampler_info.minification_filter  = .LINEAR
+	sampler_info.name = small_string("sampler")
+	result(daxa.dvc_create_sampler(ctx.device, &sampler_info, &sampler))
+	defer daxa.dvc_destroy_sampler(ctx.device, sampler)
+
+	extent := daxa.swp_get_surface_extent(ctx.swapchain)
+
+	depth_buffer: daxa.ImageId
+	depth_info := daxa.DEFAULT_IMAGE_INFO
+	depth_info.dimensions = 2
+	depth_info.format     = .D32_SFLOAT
+	depth_info.size       = {extent.width, extent.height, 1}
+	depth_info.usage      = {.TRANSFER_DST, .SHADER_SAMPLED, .DEPTH_STENCIL_ATTACHMENT}
+	depth_info.name       = small_string("depth_buffer")
+	result(daxa.dvc_create_image(ctx.device, &depth_info, &depth_buffer))
+	defer daxa.dvc_destroy_image(ctx.device, depth_buffer)
+
+	depth_view: daxa.ImageViewId
+	depth_view_info := daxa.DEFAULT_IMAGE_VIEW_INFO
+	depth_view_info.type   = .D2
+	depth_view_info.format = .D32_SFLOAT
+	depth_view_info.image  = depth_buffer
+	depth_view_info.name   = small_string("depth_view")
+	result(daxa.dvc_create_image_view(ctx.device, &depth_view_info, &depth_view))
+	defer daxa.dvc_destroy_image_view(ctx.device, depth_view)
+
+	vert_shader := #load("test_shaders/sokol_cube/vert.spv", []u32)
+	frag_shader := #load("test_shaders/sokol_cube/frag.spv", []u32)
+
+	rasterizer := daxa.DEFAULT_RASTERIZATION_INFO
+	rasterizer.front_face_winding = .CLOCKWISE
+	rasterizer.face_culling       = {.BACK}
+
+	depth_test := daxa.DEFAULT_DEPTH_TEST_INFO
+	depth_test.depth_attachment_format = .D32_SFLOAT
+	depth_test.depth_test_compare_op   = .LESS_OR_EQUAL
+	depth_test.enable_depth_write      = true
+
+	Params2 :: struct {
+		mvp:   #column_major matrix[4, 4]f32,
+		scale: f32,
+		ptr:   daxa.DeviceAddress,
+		smp:   daxa.SamplerId,
+		tex:   daxa.ImageViewId,
+	}
+
+	raster_pipeline: daxa.RasterPipeline
+	result(daxa.dvc_create_raster_pipeline(
+		device = ctx.device,
+		info = &{
+			vertex_shader_info = {
+				value = {
+					byte_code      = &vert_shader[0],
+					byte_code_size = u32(len(vert_shader)),
+					entry_point    = small_string("main"),
+				},
+				has_value = true,
+			},
+			fragment_shader_info = {
+				value = {
+					byte_code      = &frag_shader[0],
+					byte_code_size = u32(len(frag_shader)),
+					entry_point    = small_string("main"),
+				},
+				has_value = true,
+			},
+			color_attachments = {
+				data = {0 = {format = daxa.swp_get_format(ctx.swapchain)}, 1..<7 = {}},
+				size = 1,
+			},
+			depth_test = {value = depth_test, has_value = true},
+			raster     = rasterizer,
+			push_constant_size = size_of(Params2),
+			name = small_string("cube_pipeline"),
+		},
+		out_pipeline = &raster_pipeline,
+	))
+	defer daxa.raster_pipeline_dec_refcnt(raster_pipeline)
+
+	state := struct {
+		rx, ry, t: f32
+	}{}
+
+	params2 := Params2{
+		ptr = vbo_addr,
+		smp = sampler,
+		tex = image_view,
+	}
+
+	ctx.running = true
+	i := -1
+	for ctx.running {
+		i += 1
+		poll_events()
+
+		if ctx.framebuffer_resized {
+			result(daxa.swp_resize(ctx.swapchain))
+			ctx.framebuffer_resized = false
+		}
+
+		swapchain_image: daxa.ImageId
+		acq_result := daxa.swp_acquire_next_image(ctx.swapchain, &swapchain_image)
+		if acq_result != .SUCCESS do continue
+		extent = daxa.swp_get_surface_extent(ctx.swapchain)
+
+		state.rx += 1
+		state.ry += 2
+		state.t  += 0.03
+
+		proj := linalg.matrix4_perspective(linalg.to_radians(f32(60)), f32(extent.width)/f32(extent.height), 0.01, 10, true)
+		// flip for vulkan NDC
+		proj[1, 1] = -proj[1, 1]
+
+		view      := linalg.matrix4_look_at_f32({0, 1.5, 4}, {}, {0, 1, 0})
+		view_proj := proj * view
+		rxm       := linalg.matrix4_rotate_f32(linalg.to_radians(state.rx), {1, 0, 0})
+		rym       := linalg.matrix4_rotate_f32(linalg.to_radians(state.ry), {0, 1, 0})
+		model     := rxm * rym
+
+		params2.mvp   = view_proj * model
+		params2.scale = (math.sin(state.t) + 1) * 0.5
+
+		recorder: daxa.CommandRecorder
+		result(daxa.dvc_create_command_recorder(ctx.device, &{name = small_string("cube recorder")}, &recorder))
+
+		result(daxa.cmd_pipeline_image_barrier(
+			cmd_enc = recorder,
+			info = &{
+				src_access = daxa.ACCESS_TRANSFER_WRITE,
+				dst_access = daxa.ACCESS_FRAGMENT_SHADER_READ,
+				image      = image,
+			},
+		))
+
+		result(daxa.cmd_pipeline_image_barrier(
+			cmd_enc = recorder,
+			info = &{
+				dst_access       = daxa.ACCESS_EARLY_FRAGMENT_TESTS_READ_WRITE,
+				image            = depth_buffer,
+				layout_operation = .TO_GENERAL,
+			},
+		))
+
+		result(daxa.cmd_pipeline_image_barrier(
+			cmd_enc = recorder,
+			info = &{
+				dst_access       = daxa.ACCESS_COLOR_ATTACHMENT_OUTPUT_READ_WRITE,
+				image            = swapchain_image,
+				layout_operation = .TO_GENERAL,
+			},
+		))
+
+		color_att := daxa.DEFAULT_RENDER_ATTACHMENT_INFO
+		color_att.image_view  = daxa.default_view(swapchain_image)
+		color_att.load_op     = .CLEAR
+		color_att.clear_value = {
+			values = {color = {float32 = [4]f32{0.25, 0.5, 0.75, 1}}},
+			index  = 0,
+		}
+
+		depth_att := daxa.DEFAULT_RENDER_ATTACHMENT_INFO
+		depth_att.image_view  = depth_view
+		depth_att.load_op     = .CLEAR
+		depth_att.clear_value = {
+			values = {depthStencil = {depth = 1, stencil = 0}},
+			index  = 1,
+		}
+
+		result(daxa.cmd_begin_renderpass(
+			cmd_enc = recorder,
+			info = &{
+				color_attachments = {
+					data = {0 = color_att, 1..<7 = {}},
+					size = 1,
+				},
+				depth_attachment = {value = depth_att, has_value = true},
+				render_area = {
+					offset = {0, 0},
+					extent = {width = extent.width, height = extent.height},
+				},
+			},
+		))
+
+		result(daxa.cmd_set_raster_pipeline(cmd_enc = recorder, pipeline = raster_pipeline))
+
+		result(daxa.cmd_push_constant(
+			cmd_enc = recorder,
+			info = &{data = &params2, size = size_of(params2)},
+		))
+
+		result(daxa.cmd_set_index_buffer(
+			cmd_enc = recorder,
+			info = &{buffer = index_buffer, offset = 0, index_type = .UINT16},
+		))
+
+		daxa.cmd_draw_indexed(
+			cmd_enc = recorder,
+			info = &{index_count = 36, instance_count = 1, first_index = 0, vertex_offset = 0, first_instance = 0},
+		)
+
+		daxa.cmd_end_renderpass(recorder)
+
+		result(daxa.cmd_pipeline_image_barrier(
+			cmd_enc = recorder,
+			info = &{
+				src_access       = daxa.ACCESS_COLOR_ATTACHMENT_OUTPUT_READ_WRITE,
+				image            = swapchain_image,
+				layout_operation = .TO_PRESENT_SRC,
+			},
+		))
+
+		commands: daxa.ExecutableCommandList
+		result(daxa.cmd_complete_current_commands(recorder, &commands))
+		daxa.destroy_command_recorder(recorder)
+
+		acquire_sema := daxa.swp_current_acquire_semaphore(ctx.swapchain)
+		present_sema := daxa.swp_current_present_semaphore(ctx.swapchain)
+		timeline_pair := daxa.TimelinePair{
+			semaphore = daxa.swp_gpu_timeline_semaphore(ctx.swapchain)^,
+			value     = daxa.swp_current_cpu_timeline_value(ctx.swapchain),
+		}
+
+		result(daxa.dvc_submit_commands(
+			device = ctx.device,
+			info = &{
+				command_lists                   = &commands,
+				command_list_count              = 1,
+				wait_binary_semaphores          = acquire_sema,
+				wait_binary_semaphore_count     = 1,
+				signal_binary_semaphores        = present_sema,
+				signal_binary_semaphore_count   = 1,
+				signal_timeline_semaphores      = &timeline_pair,
+				signal_timeline_semaphore_count = 1,
+			},
+			out_submit_index = nil,
+		))
+		daxa.executable_commands_dec_refcnt(commands)
+
+		result(daxa.dvc_present_frame(
+			device = ctx.device,
+			info = &{
+				wait_binary_semaphores      = present_sema,
+				wait_binary_semaphore_count = 1,
+				swapchain                   = ctx.swapchain,
+				queue                       = {},
+			},
+		))
+
+		result(daxa.dvc_collect_garbage(ctx.device))
+
+		log.debug("end frame:", i)
+		if i > 600 do break
+	}
 }

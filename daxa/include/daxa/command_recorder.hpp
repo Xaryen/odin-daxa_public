@@ -19,16 +19,14 @@ namespace daxa
 
     struct CommandRecorderInfo
     {
-        QueueFamily queue_family = {};
+        QueueType queue_type = {};
         SmallString name = {};
     };
 
     struct ImageBlitInfo
     {
         ImageId src_image = {};
-        [[deprecated("Ignored parameter, layout must be GENERAL; API:3.2")]] ImageLayout src_image_layout = ImageLayout::GENERAL;
         ImageId dst_image = {};
-        [[deprecated("Ignored parameter, layout must be GENERAL; API:3.2")]] ImageLayout dst_image_layout = ImageLayout::GENERAL;
         ImageArraySlice src_slice = {};
         std::array<Offset3D, 2> src_offsets = {};
         ImageArraySlice dst_slice = {};
@@ -47,10 +45,9 @@ namespace daxa
 
     struct BufferImageCopyInfo
     {
-        BufferId buffer = {};
+        BufferId src_buffer = {};
         usize buffer_offset = {};
-        ImageId image = {};
-        [[deprecated("Ignored parameter, layout must be GENERAL; API:3.2")]] ImageLayout image_layout = ImageLayout::GENERAL;
+        ImageId dst_image = {};
         ImageArraySlice image_slice = {};
         Offset3D image_offset = {};
         Extent3D image_extent = {};
@@ -58,21 +55,18 @@ namespace daxa
 
     struct ImageBufferCopyInfo
     {
-        ImageId image = {};
-        [[deprecated("Ignored parameter, layout must be GENERAL; API:3.2")]] ImageLayout image_layout = ImageLayout::GENERAL;
+        ImageId src_image = {};
         ImageArraySlice image_slice = {};
         Offset3D image_offset = {};
         Extent3D image_extent = {};
-        BufferId buffer = {};
+        BufferId dst_buffer = {};
         usize buffer_offset = {};
     };
 
     struct ImageCopyInfo
     {
         ImageId src_image = {};
-        [[deprecated("Ignored parameter, layout must be GENERAL; API:3.2")]] ImageLayout src_image_layout = daxa::ImageLayout::GENERAL;
         ImageId dst_image = {};
-        [[deprecated("Ignored parameter, layout must be GENERAL; API:3.2")]] ImageLayout dst_image_layout = daxa::ImageLayout::GENERAL;
         ImageArraySlice src_slice = {};
         Offset3D src_offset = {};
         ImageArraySlice dst_slice = {};
@@ -82,10 +76,9 @@ namespace daxa
 
     struct ImageClearInfo
     {
-        [[deprecated("Ignored parameter, layout must be GENERAL; API:3.2")]] ImageLayout dst_image_layout = daxa::ImageLayout::GENERAL;
+        ImageId image = {};
+        ImageMipArraySlice slice = {};
         ClearValue clear_value = {};
-        ImageId dst_image = {};
-        ImageMipArraySlice dst_slice = {};
     };
 
     struct BufferClearInfo
@@ -109,13 +102,11 @@ namespace daxa
     {
         ResolveMode mode = ResolveMode::AVERAGE;
         ImageViewId image = {};
-        [[deprecated("Ignored parameter, layout must be GENERAL; API:3.2")]] ImageLayout layout = ImageLayout::GENERAL;
     };
 
     struct RenderAttachmentInfo
     {
         ImageViewId image_view = {};
-        [[deprecated("Ignored parameter, layout must be GENERAL; API:3.2")]] ImageLayout layout = ImageLayout::GENERAL;
         AttachmentLoadOp load_op = AttachmentLoadOp::DONT_CARE;
         AttachmentStoreOp store_op = AttachmentStoreOp::STORE;
         ClearValue clear_value = {};
@@ -163,6 +154,13 @@ namespace daxa
     {
         BufferId indirect_buffer = {};
         usize offset = {};
+    };
+
+    struct DrawMeshTasksInfo
+    {
+        u32 x = {};
+        u32 y = {};
+        u32 z = {};
     };
 
     struct DrawMeshTasksIndirectInfo
@@ -260,7 +258,7 @@ namespace daxa
 
     struct SetIndexBufferInfo
     {
-        BufferId id = {};
+        BufferId buffer = {};
         usize offset = {};
         IndexType index_type = IndexType::uint32;
     };
@@ -302,7 +300,7 @@ namespace daxa
 
         void push_constant_vptr(PushConstantInfo const & info);
         template <typename T>
-        void push_constant(T const & constant, [[maybe_unused]] [[deprecated("parameter ignored. API: 3.1")]] u32 offset = 0)
+        void push_constant(T const & constant)
         {
             push_constant_vptr({
                 .data = static_cast<void const *>(&constant),
@@ -320,7 +318,7 @@ namespace daxa
         void draw_indexed(DrawIndexedInfo const & info);
         void draw_indirect(DrawIndirectInfo const & info);
         void draw_indirect_count(DrawIndirectCountInfo const & info);
-        void draw_mesh_tasks(u32 x, u32 y, u32 z);
+        void draw_mesh_tasks(DrawMeshTasksInfo const & info);
         void draw_mesh_tasks_indirect(DrawMeshTasksIndirectInfo const & info);
         void draw_mesh_tasks_indirect_count(DrawMeshTasksIndirectCountInfo const & info);
     };
@@ -379,30 +377,26 @@ namespace daxa
         void wait_event(EventWaitInfo const & info);
         void reset_event(ResetEventInfo const & info);
 
-#if !DAXA_REMOVE_DEPRECATED
-        [[deprecated("Use pipeline_image_barrier instead, API:3.2")]] void pipeline_barrier_image_transition(ImageMemoryBarrierInfo const & info);
-#endif
-
         /// @brief  Destroys the buffer AFTER the gpu is finished executing the command list.
         ///         Zombifies object after submitting the commands.
         ///         Useful for large uploads exceeding staging memory pools.
-        /// @param id buffer to be destroyed after command list finishes.
-        void destroy_buffer_deferred(BufferId id);
+        /// @param buffer buffer to be destroyed after command list finishes.
+        void destroy_buffer_deferred(BufferId buffer);
         /// @brief  Destroys the image AFTER the gpu is finished executing the command list.
         ///         Zombifies object after submitting the commands.
         ///         Useful for large uploads exceeding staging memory pools.
-        /// @param id image to be destroyed after command list finishes.
-        void destroy_image_deferred(ImageId id);
+        /// @param image image to be destroyed after command list finishes.
+        void destroy_image_deferred(ImageId image);
         /// @brief  Destroys the image view AFTER the gpu is finished executing the command list.
         ///         Zombifies object after submitting the commands.
         ///         Useful for large uploads exceeding staging memory pools.
-        /// @param id image view to be destroyed after command list finishes.
-        void destroy_image_view_deferred(ImageViewId id);
+        /// @param image_view image view to be destroyed after command list finishes.
+        void destroy_image_view_deferred(ImageViewId image_view);
         /// @brief  Destroys the sampler AFTER the gpu is finished executing the command list.
         ///         Zombifies object after submitting the commands.
         ///         Useful for large uploads exceeding staging memory pools.
-        /// @param id image sampler be destroyed after command list finishes.
-        void destroy_sampler_deferred(SamplerId id);
+        /// @param sampler image sampler be destroyed after command list finishes.
+        void destroy_sampler_deferred(SamplerId sampler);
 
         void write_timestamp(WriteTimestampInfo const & info);
         void reset_timestamps(ResetTimestampsInfo const & info);

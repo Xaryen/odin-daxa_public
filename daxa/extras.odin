@@ -39,6 +39,12 @@ Variant :: struct($RAW_UNION: typeid) {
 	index: VARIANT_INDEX_TYPE,
 }
 
+// ABI-compatible with daxa_SpanToConst(T): { T const * data; size_t size; }
+SpanToConst :: struct($T: typeid) {
+	data: [^]T,
+	size: uint,
+}
+
 // NOTE: In the wrapper Optional is replaced by Maybe(T)
 // or multiple return values on case by case basis
 // for parameters maybe have a set_optional() helper

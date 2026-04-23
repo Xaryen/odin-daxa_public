@@ -8,22 +8,20 @@ foreign import lib "daxa.lib"
 _ :: lib
 
 /// WARNING:
-///   Checks for command types against queue family only performed in c++ api!!
+///   Checks for command types against queue type only performed in c++ api!!
 PushConstantInfo :: struct {
 	data: rawptr,
 	size: u64,
 }
 
 CommandRecorderInfo :: struct {
-	queue_family: QueueFamily,
-	name:         SmallString,
+	queue_type: QueueType,
+	name:       SmallString,
 }
 
 ImageBlitInfo :: struct #all_or_none {
 	src_image:        ImageId,
-	src_image_layout: ImageLayout,
 	dst_image:        ImageId,
-	dst_image_layout: ImageLayout,
 	src_slice:        ImageArraySlice,
 	src_offsets:      [2]vk.Offset3D,
 	dst_slice:        ImageArraySlice,
@@ -32,9 +30,7 @@ ImageBlitInfo :: struct #all_or_none {
 }
 DEFAULT_IMAGE_BLIT_INFO :: ImageBlitInfo{
 	src_image = {},
-	src_image_layout = .GENERAL,
 	dst_image = {},
-	dst_image_layout = .GENERAL,
 	src_slice = DEFAULT_IMAGE_ARRAY_SLICE,
 	src_offsets = {},
 	dst_slice = DEFAULT_IMAGE_ARRAY_SLICE,
@@ -52,19 +48,17 @@ BufferCopyInfo :: struct {
 // DEFAULT_BUFFER_COPY_INFO :: BufferCopyInfo{}
 
 BufferImageCopyInfo :: struct #all_or_none {
-	buffer:        BufferId,
+	src_buffer:    BufferId,
 	buffer_offset: c.size_t,
-	image:         ImageId,
-	image_layout:  ImageLayout,
+	dst_image:     ImageId,
 	image_slice:   ImageArraySlice,
 	image_offset:  vk.Offset3D,
 	image_extent:  vk.Offset3D,
 }
 DEFAULT_BUFFER_IMAGE_COPY_INFO :: BufferImageCopyInfo{
-	buffer = {},
+	src_buffer = {},
 	buffer_offset = 0,
-	image = {},
-	image_layout = .GENERAL,
+	dst_image = {},
 	image_slice = DEFAULT_IMAGE_ARRAY_SLICE,
 	image_offset = {},
 	image_extent = {},
@@ -72,29 +66,25 @@ DEFAULT_BUFFER_IMAGE_COPY_INFO :: BufferImageCopyInfo{
 
 
 ImageBufferCopyInfo :: struct #all_or_none {
-	image:         ImageId,
-	image_layout:  ImageLayout,
+	src_image:     ImageId,
 	image_slice:   ImageArraySlice,
 	image_offset:  vk.Offset3D,
 	image_extent:  vk.Offset3D,
-	buffer:        BufferId,
+	dst_buffer:    BufferId,
 	buffer_offset: c.size_t,
 }
 DEFAULT_IMAGE_BUFFER_COPY_INFO :: ImageBufferCopyInfo{
-	image = {},
-	image_layout = .GENERAL,
+	src_image = {},
 	image_slice = DEFAULT_IMAGE_ARRAY_SLICE,
 	image_offset = {},
 	image_extent = {},
-	buffer = {},
+	dst_buffer = {},
 	buffer_offset = 0,
 }
 
 ImageCopyInfo :: struct #all_or_none {
 	src_image:        ImageId,
-	src_image_layout: ImageLayout,
 	dst_image:        ImageId,
-	dst_image_layout: ImageLayout,
 	src_slice:        ImageArraySlice,
 	src_offset:       vk.Offset3D,
 	dst_slice:        ImageArraySlice,
@@ -103,9 +93,7 @@ ImageCopyInfo :: struct #all_or_none {
 }
 DEFAULT_IMAGE_COPY_INFO :: ImageCopyInfo{
 	src_image = {},
-	src_image_layout = .GENERAL,
 	dst_image = {},
-	dst_image_layout = .GENERAL,
 	src_slice = DEFAULT_IMAGE_ARRAY_SLICE,
 	src_offset = {},
 	dst_slice = DEFAULT_IMAGE_ARRAY_SLICE,
@@ -114,18 +102,16 @@ DEFAULT_IMAGE_COPY_INFO :: ImageCopyInfo{
 }
 
 ImageClearInfo :: struct #all_or_none {
-	image_layout: ImageLayout,
+	image: ImageId,
+	slice: ImageMipArraySlice,
 
-	// // Make sure this stays abi compatible with daxa::ClearValue
+	// Make sure this stays abi compatible with daxa::ClearValue
 	clear_value: Variant(vk.ClearValue),
-	image:     ImageId,
-	dst_slice: ImageMipArraySlice,
 }
 DEFAULT_IMAGE_CLEAR_INFO :: ImageClearInfo{
-	image_layout = .GENERAL,
-	clear_value  = {},
-	image        = {},
-	dst_slice    = DEFAULT_IMAGE_MIP_ARRAY_SLICE,
+	image       = {},
+	slice       = DEFAULT_IMAGE_MIP_ARRAY_SLICE,
+	clear_value = {},
 }
 
 BufferClearInfo :: struct {
@@ -136,19 +122,16 @@ BufferClearInfo :: struct {
 }
 
 AttachmentResolveInfo :: struct #all_or_none {
-	mode:   vk.ResolveModeFlags,
-	image:  ImageViewId,
-	layout: ImageLayout,
+	mode:  vk.ResolveModeFlags,
+	image: ImageViewId,
 }
 DEFAULT_RENDER_ATTACHMENT_RESOLVE_INFO :: AttachmentResolveInfo{
 	mode = {.AVERAGE},
 	image = {},
-	layout = .GENERAL,
 }
 
 RenderAttachmentInfo :: struct #all_or_none {
 	image_view: ImageViewId,
-	layout:     ImageLayout,
 	load_op:    vk.AttachmentLoadOp,
 	store_op:   vk.AttachmentStoreOp,
 
@@ -157,7 +140,6 @@ RenderAttachmentInfo :: struct #all_or_none {
 }
 DEFAULT_RENDER_ATTACHMENT_INFO :: RenderAttachmentInfo{
 	image_view = {},
-	layout = .GENERAL,
 	load_op = .DONT_CARE,
 	store_op = .STORE,
 	clear_value = {},
@@ -202,6 +184,13 @@ DispatchIndirectInfo :: struct {
 	indirect_buffer: BufferId,
 	offset:          c.size_t,
 }
+
+DrawMeshTasksInfo :: struct {
+	x: u32,
+	y: u32,
+	z: u32,
+}
+DEFAULT_DRAW_MESH_TASKS_INFO :: DrawMeshTasksInfo{}
 
 DrawMeshTasksIndirectInfo :: struct #all_or_none {
 	indirect_buffer: BufferId,
@@ -370,23 +359,19 @@ foreign lib {
 
 	/// @brief  Destroys the buffer AFTER the gpu is finished executing the command list.
 	///         Useful for large uploads exceeding staging memory pools.
-	/// @param id buffer to be destroyed after command list finishes.
-	cmd_destroy_buffer_deferred :: proc(cmd_enc: CommandRecorder, id: BufferId) -> Result ---
+	cmd_destroy_buffer_deferred :: proc(cmd_enc: CommandRecorder, buffer: BufferId) -> Result ---
 
 	/// @brief  Destroys the image AFTER the gpu is finished executing the command list.
 	///         Useful for large uploads exceeding staging memory pools.
-	/// @param id image to be destroyed after command list finishes.
-	cmd_destroy_image_deferred :: proc(cmd_enc: CommandRecorder, id: ImageId) -> Result ---
+	cmd_destroy_image_deferred :: proc(cmd_enc: CommandRecorder, image: ImageId) -> Result ---
 
 	/// @brief  Destroys the image view AFTER the gpu is finished executing the command list.
 	///         Useful for large uploads exceeding staging memory pools.
-	/// @param id image view to be destroyed after command list finishes.
-	cmd_destroy_image_view_deferred :: proc(cmd_enc: CommandRecorder, id: ImageViewId) -> Result ---
+	cmd_destroy_image_view_deferred :: proc(cmd_enc: CommandRecorder, image_view: ImageViewId) -> Result ---
 
 	/// @brief  Destroys the sampler AFTER the gpu is finished executing the command list.
 	///         Useful for large uploads exceeding staging memory pools.
-	/// @param id image sampler be destroyed after command list finishes.
-	cmd_destroy_sampler_deferred :: proc(cmd_enc: CommandRecorder, id: SamplerId) -> Result ---
+	cmd_destroy_sampler_deferred :: proc(cmd_enc: CommandRecorder, sampler: SamplerId) -> Result ---
 	cmd_trace_rays               :: proc(cmd_enc: CommandRecorder, info: ^TraceRaysInfo) -> Result ---
 	cmd_trace_rays_indirect      :: proc(cmd_enc: CommandRecorder, info: ^TraceRaysIndirectInfo) -> Result ---
 
@@ -406,7 +391,7 @@ foreign lib {
 	cmd_draw_indexed                   :: proc(cmd_enc: CommandRecorder, info: ^DrawIndexedInfo) ---
 	cmd_draw_indirect                  :: proc(cmd_enc: CommandRecorder, info: ^DrawIndirectInfo) -> Result ---
 	cmd_draw_indirect_count            :: proc(cmd_enc: CommandRecorder, info: ^DrawIndirectCountInfo) -> Result ---
-	cmd_draw_mesh_tasks                :: proc(cmd_enc: CommandRecorder, x: u32, y: u32, z: u32) ---
+	cmd_draw_mesh_tasks                :: proc(cmd_enc: CommandRecorder, info: ^DrawMeshTasksInfo) -> Result ---
 	cmd_draw_mesh_tasks_indirect       :: proc(cmd_enc: CommandRecorder, info: ^DrawMeshTasksIndirectInfo) -> Result ---
 	cmd_draw_mesh_tasks_indirect_count :: proc(cmd_enc: CommandRecorder, info: ^DrawMeshTasksIndirectCountInfo) -> Result ---
 	cmd_write_timestamp                :: proc(cmd_enc: CommandRecorder, info: ^WriteTimestampInfo) ---

@@ -33,14 +33,14 @@ VmaAllocation   :: ^VmaAllocation_T
 @(default_calling_convention="c", link_prefix="daxa_")
 foreign lib {
 	default_view          :: proc(image: ImageId) -> ImageViewId ---
-	index_of_buffer       :: proc(id: BufferId) -> u32 ---
-	index_of_image        :: proc(id: ImageId) -> u32 ---
-	index_of_image_view   :: proc(id: ImageViewId) -> u32 ---
-	index_of_sampler      :: proc(id: SamplerId) -> u32 ---
-	version_of_buffer     :: proc(id: BufferId) -> u64 ---
-	version_of_image      :: proc(id: ImageId) -> u64 ---
-	version_of_image_view :: proc(id: ImageViewId) -> u64 ---
-	version_of_sampler    :: proc(id: SamplerId) -> u64 ---
+	index_of_buffer       :: proc(buffer: BufferId) -> u32 ---
+	index_of_image        :: proc(image: ImageId) -> u32 ---
+	index_of_image_view   :: proc(image_view: ImageViewId) -> u32 ---
+	index_of_sampler      :: proc(sampler: SamplerId) -> u32 ---
+	version_of_buffer     :: proc(buffer: BufferId) -> u64 ---
+	version_of_image      :: proc(image: ImageId) -> u64 ---
+	version_of_image_view :: proc(image_view: ImageViewId) -> u64 ---
+	version_of_sampler    :: proc(sampler: SamplerId) -> u64 ---
 }
 
 DeviceAddress :: struct {
@@ -51,12 +51,12 @@ BufferInfo :: struct {
 	size: c.size_t,
 
 	// Ignored when allocating with a memory block.
-	allocate_info: MemoryFlags,
-	name:          SmallString,
+	memory_flags: MemoryFlags,
+	name:         SmallString,
 }
 DEFAULT_BUFFER_INFO :: BufferInfo{
 	size = 0,
-	allocate_info = MEMORY_FLAG_NONE,
+	memory_flags = MEMORY_FLAG_NONE,
 	name = {},
 }
 
@@ -84,11 +84,6 @@ ImageUsageFlag :: enum u32 {
 ImageUsageFlags :: bit_set[ImageUsageFlag; u32]
 IMAGE_USAGE_FLAG_NONE :: ImageUsageFlags{}
 
-SharingMode :: enum i32 {
-	EXCLUSIVE  = 0,
-	CONCURRENT = 1,
-}
-
 ImageInfo :: struct {
 	flags:             ImageFlags,
 	dimensions:        u32,
@@ -98,11 +93,10 @@ ImageInfo :: struct {
 	array_layer_count: u32,
 	sample_count:      u32,
 	usage:             ImageUsageFlags,
-	sharing_mode:      SharingMode,
 
 	// Ignored when allocating with a memory block.
-	allocate_info: MemoryFlags,
-	name:          SmallString,
+	memory_flags: MemoryFlags,
+	name:         SmallString,
 }
 DEFAULT_IMAGE_INFO :: ImageInfo{
 	flags             = IMAGE_FLAG_NONE,
@@ -113,8 +107,7 @@ DEFAULT_IMAGE_INFO :: ImageInfo{
 	array_layer_count = 1,
 	sample_count      = 1,
 	usage             = {},
-	sharing_mode      = .EXCLUSIVE,
-	allocate_info     = {},
+	memory_flags      = {},
 	name              = {},
 }
 

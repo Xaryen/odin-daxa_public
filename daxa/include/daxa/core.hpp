@@ -30,7 +30,7 @@
         else if (!(x))                                                            \
         {                                                                         \
             std::cerr << DAXA_DBG_ASSERT_FAIL_STRING << ": " << (m) << std::endl; \
-            throw std::runtime_error("DAXA DEBUG ASSERTION FAILURE");             \
+            std::abort();                                                         \
         }                                                                         \
     } while (false)
 #else
@@ -46,24 +46,6 @@
 #if !defined(DAXA_REMOVE_DEPRECATED)
 #define DAXA_REMOVE_DEPRECATED 1
 #endif
-
-namespace daxa
-{
-    /// @brief  A platform-dependent window resource.
-    ///         On Windows, this is an `HWND`
-    ///         On Linux X11, this is a `Window`
-    ///         On Linux Wayland, this is a `wl_surface *`
-    using NativeWindowHandle = void *;
-
-    enum struct NativeWindowPlatform
-    {
-        UNKNOWN,
-        WIN32_API,
-        XLIB_API,
-        WAYLAND_API,
-        MAX_ENUM = 0x7fffffff,
-    };
-} // namespace daxa
 
 namespace daxa
 {

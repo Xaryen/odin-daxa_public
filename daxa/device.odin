@@ -344,8 +344,8 @@ DEFAULT_DEVICE_INFO_2 :: DeviceInfo2{
 }
 
 Queue :: struct {
-	family: QueueFamily,
-	index:  u32,
+	type:  QueueType,
+	index: u32,
 }
 
 QueueSubmitIndexPair :: struct {
@@ -355,7 +355,6 @@ QueueSubmitIndexPair :: struct {
 
 CommandSubmitInfo :: struct {
 	queue:                           Queue,
-	wait_stages:                     vk.PipelineStageFlags,
 	command_lists:                   ^ExecutableCommandList,
 	command_list_count:              u64,
 	wait_binary_semaphores:          ^BinarySemaphore,
@@ -406,13 +405,13 @@ MemoryBlockImageInfo :: struct {
 
 BufferTlasInfo :: struct {
 	tlas_info: TlasInfo,
-	buffer_id: BufferId,
+	buffer:    BufferId,
 	offset:    u64,
 }
 
 BufferBlasInfo :: struct {
 	blas_info: BlasInfo,
-	buffer_id: BufferId,
+	buffer:    BufferId,
 	offset:    u64,
 }
 
@@ -423,24 +422,24 @@ AccelerationStructureBuildSizesInfo :: struct {
 }
 
 BufferIdDeviceMemorySizePair :: struct {
-	id:              BufferId,
+	buffer:          BufferId,
 	size:            u64,
 	block_allocated: Bool8,
 }
 
 ImageIdDeviceMemorySizePair :: struct {
-	id:              ImageId,
+	image:           ImageId,
 	size:            u64,
 	block_allocated: Bool8,
 }
 
 TlasIdDeviceMemorySizePair :: struct {
-	id:   TlasId,
+	tlas: TlasId,
 	size: u64,
 }
 
 BlasIdDeviceMemorySizePair :: struct {
-	id:   BlasId,
+	blas: BlasId,
 	size: u64,
 }
 
@@ -477,8 +476,7 @@ MemoryImageCopyFlags :: bit_set[MemoryImageCopyFlag; i32]
 MemoryToImageCopyInfo :: struct {
 	flags:        MemoryImageCopyFlags,
 	memory_ptr:   ^byte,
-	image_id:     ImageId,
-	image_layout: ImageLayout,
+	image:        ImageId,
 	image_slice:  ImageArraySlice,
 	image_offset: vk.Offset3D,
 	image_extent: vk.Extent3D,
@@ -486,8 +484,7 @@ MemoryToImageCopyInfo :: struct {
 
 ImageToMemoryCopyInfo :: struct {
 	flags:        MemoryImageCopyFlags,
-	image_id:     ImageId,
-	image_layout: ImageLayout,
+	image:        ImageId,
 	image_slice:  ImageArraySlice,
 	image_offset: vk.Offset3D,
 	image_extent: vk.Extent3D,
@@ -495,13 +492,21 @@ ImageToMemoryCopyInfo :: struct {
 }
 
 HostImageLayoutOperationInfo :: struct {
-	image_id:         ImageId,
+	image:            ImageId,
 	layout_operation: ImageLayoutOperation,
 }
 
-BufferIdOffsetPair :: struct {
-	buffer_id: BufferId,
-	offset:    u64,
+BufferOffsetPair :: struct {
+	buffer: BufferId,
+	offset: u64,
+}
+
+ChooseSwapchainSurfaceFormatInfo :: struct {
+	native_window_info: NativeWindowInfo,
+
+	// Leave this span completely empty for daxa to select a surface format.
+	// For each preferred format, leave the color space empty (MAX_ENUM) for daxa to select a color space.
+	preferred_formats: SpanToConst(vk.SurfaceFormatKHR),
 }
 
 
@@ -525,19 +530,19 @@ foreign lib {
 	dvc_create_blas_from_buffer             :: proc(device: Device, info: ^BufferBlasInfo, out_id: ^BlasId) -> Result ---
 	dvc_inc_refcnt_buffer                   :: proc(device: Device, buffer: BufferId) -> Result ---
 	dvc_inc_refcnt_image                    :: proc(device: Device, image: ImageId) -> Result ---
-	dvc_inc_refcnt_image_view               :: proc(device: Device, id: ImageViewId) -> Result ---
+	dvc_inc_refcnt_image_view               :: proc(device: Device, image_view: ImageViewId) -> Result ---
 	dvc_inc_refcnt_sampler                  :: proc(device: Device, sampler: SamplerId) -> Result ---
 	dvc_inc_refcnt_tlas                     :: proc(device: Device, tlas: TlasId) -> Result ---
 	dvc_inc_refcnt_blas                     :: proc(device: Device, blas: BlasId) -> Result ---
 	dvc_destroy_buffer                      :: proc(device: Device, buffer: BufferId) -> Result ---
 	dvc_destroy_image                       :: proc(device: Device, image: ImageId) -> Result ---
-	dvc_destroy_image_view                  :: proc(device: Device, id: ImageViewId) -> Result ---
+	dvc_destroy_image_view                  :: proc(device: Device, image_view: ImageViewId) -> Result ---
 	dvc_destroy_sampler                     :: proc(device: Device, sampler: SamplerId) -> Result ---
 	dvc_destroy_tlas                        :: proc(device: Device, tlas: TlasId) -> Result ---
 	dvc_destroy_blas                        :: proc(device: Device, blas: BlasId) -> Result ---
 	dvc_info_buffer                         :: proc(device: Device, buffer: BufferId, out_info: ^BufferInfo) -> Result ---
 	dvc_info_image                          :: proc(device: Device, image: ImageId, out_info: ^ImageInfo) -> Result ---
-	dvc_info_image_view                     :: proc(device: Device, id: ImageViewId, out_info: ^ImageViewInfo) -> Result ---
+	dvc_info_image_view                     :: proc(device: Device, image_view: ImageViewId, out_info: ^ImageViewInfo) -> Result ---
 	dvc_info_sampler                        :: proc(device: Device, sampler: SamplerId, out_info: ^SamplerInfo) -> Result ---
 	dvc_info_tlas                           :: proc(device: Device, acceleration_structure: TlasId, out_info: ^TlasInfo) -> Result ---
 	dvc_info_blas                           :: proc(device: Device, acceleration_structure: BlasId, out_info: ^BlasInfo) -> Result ---
@@ -549,7 +554,7 @@ foreign lib {
 	dvc_is_blas_valid                       :: proc(device: Device, blas: BlasId) -> Bool8 ---
 	dvc_get_vk_buffer                       :: proc(device: Device, buffer: BufferId, out_vk_handle: ^vk.Buffer) -> Result ---
 	dvc_get_vk_image                        :: proc(device: Device, image: ImageId, out_vk_handle: ^vk.Image) -> Result ---
-	dvc_get_vk_image_view                   :: proc(device: Device, id: ImageViewId, out_vk_handle: ^vk.ImageView) -> Result ---
+	dvc_get_vk_image_view                   :: proc(device: Device, image_view: ImageViewId, out_vk_handle: ^vk.ImageView) -> Result ---
 	dvc_get_vk_sampler                      :: proc(device: Device, sampler: SamplerId, out_vk_handle: ^vk.Sampler) -> Result ---
 	dvc_get_vk_tlas                         :: proc(device: Device, tlas: TlasId, out_vk_handle: ^vk.AccelerationStructureInstanceKHR) -> Result ---
 	dvc_get_vk_blas                         :: proc(device: Device, blas: BlasId, out_vk_handle: ^vk.AccelerationStructureInstanceKHR) -> Result ---
@@ -558,7 +563,7 @@ foreign lib {
 	dvc_tlas_device_address                 :: proc(device: Device, tlas: TlasId, out_addr: ^DeviceAddress) -> Result ---
 	dvc_blas_device_address                 :: proc(device: Device, blas: BlasId, out_addr: ^DeviceAddress) -> Result ---
 
-	dvc_buffer_device_address_to_buffer     :: proc(device: Device, address: DeviceAddress, out_buffer_id_offset_pair: ^BufferIdOffsetPair) -> Result ---
+	dvc_buffer_device_address_to_buffer     :: proc(device: Device, address: DeviceAddress, out_buffer_offset_pair: ^BufferOffsetPair) -> Result ---
 
 	dvc_create_raster_pipeline              :: proc(device: Device, info: ^RasterPipelineInfo, out_pipeline: ^RasterPipeline) -> Result ---
 	dvc_create_compute_pipeline             :: proc(device: Device, info: ^ComputePipelineInfo, out_pipeline: ^ComputePipeline) -> Result ---
@@ -576,17 +581,22 @@ foreign lib {
 	dvc_image_layout_operation      :: proc(device: Device, info: ^HostImageLayoutOperationInfo) -> Result ---
 	dvc_get_vk_device               :: proc(device: Device) -> vk.Device ---
 	dvc_get_vk_physical_device      :: proc(device: Device) -> vk.PhysicalDevice ---
-	dvc_get_vk_queue                :: proc(self: Device, queue: Queue, vk_queue: ^vk.Queue, vk_queue_family_index: ^u32) -> Result ---
+	dvc_get_vk_queue                :: proc(self: Device, queue: Queue, vk_queue: ^vk.Queue, vk_queue_type_index: ^u32) -> Result ---
 	dvc_queue_wait_idle             :: proc(device: Device, queue: Queue) -> Result ---
-	dvc_queue_count                 :: proc(device: Device, queue_family: QueueFamily, out_value: ^u32) -> Result ---
+	dvc_queue_count                 :: proc(device: Device, queue_type: QueueType, out_value: ^u32) -> Result ---
 	dvc_wait_idle                   :: proc(device: Device) -> Result ---
-	dvc_submit                      :: proc(device: Device, info: ^CommandSubmitInfo, out_submit_index: ^u64) -> Result ---
+	dvc_submit_commands             :: proc(device: Device, info: ^CommandSubmitInfo, out_submit_index: ^u64) -> Result ---
 	dvc_latest_submit_index         :: proc(device: Device, submit_index: ^u64) -> Result ---
 	dvc_oldest_pending_submit_index :: proc(device: Device, submit_index: ^u64) -> Result ---
 	dvc_latest_queue_submit_index   :: proc(device: Device, queue: Queue, submit_index: ^u64) -> Result ---
 	dvc_wait_on_submit              :: proc(device: Device, info: WaitOnSubmitInfo) -> Result ---
-	dvc_present                     :: proc(device: Device, info: ^PresentInfo) -> Result ---
+	dvc_present_frame               :: proc(device: Device, info: ^PresentInfo) -> Result ---
 	dvc_collect_garbage             :: proc(device: Device) -> Result ---
+
+	dvc_report_supported_present_modes      :: proc(device: Device, native_window: NativeWindowInfo, out_present_mode_count: ^u32, out_present_modes: ^vk.PresentModeKHR) -> Result ---
+	dvc_report_supported_image_formats      :: proc(device: Device, native_window: NativeWindowInfo, out_format_count: ^u32, out_formats: ^vk.SurfaceFormatKHR) -> Result ---
+	dvc_choose_swapchain_surface_format     :: proc(device: Device, info: ^ChooseSwapchainSurfaceFormatInfo, out_format: ^vk.SurfaceFormatKHR) -> Result ---
+
 	dvc_info                        :: proc(device: Device) -> ^DeviceInfo2 ---
 	dvc_properties                  :: proc(device: Device) -> ^DeviceProperties ---
 

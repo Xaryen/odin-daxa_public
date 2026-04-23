@@ -1,7 +1,7 @@
 #pragma once
 
 #if !DAXA_BUILT_WITH_UTILS_MEM
-#error "[package management error] You must build Daxa with the DAXA_ENABLE_UTILS_MEM CMake option enabled, or request the utils-mem feature in vcpkg"
+#error "[build error] You must build Daxa with the DAXA_ENABLE_UTILS_MEM CMake option enabled"
 #endif
 
 #include <daxa/core.hpp>
@@ -65,6 +65,7 @@ namespace daxa
         DAXA_EXPORT_CXX void reuse_memory_after_pending_submits();
 
       private:
+        DAXA_EXPORT_CXX auto allocate_internal(u32 size, u32 alignment_requirement, bool try_again_on_fail) -> std::optional<Allocation>;
         // Reclaim expired memory allocations.
         DAXA_EXPORT_CXX void reclaim_memory();
         struct TrackedAllocation

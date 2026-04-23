@@ -12,7 +12,7 @@ typedef struct
 static daxa_Access const NONE = {.stages = 0, .access_type = 0};
 
 static daxa_Access const DAXA_ACCESS_TOP_OF_PIPE_READ = {.stages = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
-static daxa_Access const DAXA_ACCESS_DRAW_INDIRECT_READ = {.stages = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
+static daxa_Access const DAXA_ACCESS_INDIRECT_COMMAND_READ = {.stages = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
 static daxa_Access const DAXA_ACCESS_VERTEX_SHADER_READ = {.stages = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
 static daxa_Access const DAXA_ACCESS_TESSELLATION_CONTROL_SHADER_READ = {.stages = VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
 static daxa_Access const DAXA_ACCESS_TESSELLATION_EVALUATION_SHADER_READ = {.stages = VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
@@ -25,7 +25,7 @@ static daxa_Access const DAXA_ACCESS_COMPUTE_SHADER_READ = {.stages = VK_PIPELIN
 static daxa_Access const DAXA_ACCESS_TRANSFER_READ = {.stages = VK_PIPELINE_STAGE_2_TRANSFER_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
 static daxa_Access const DAXA_ACCESS_BOTTOM_OF_PIPE_READ = {.stages = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
 static daxa_Access const DAXA_ACCESS_HOST_READ = {.stages = VK_PIPELINE_STAGE_2_HOST_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
-static daxa_Access const DAXA_ACCESS_ALL_GRAPHICS_READ = {.stages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
+static daxa_Access const DAXA_ACCESS_ALL_RASTER_READ = {.stages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
 static daxa_Access const DAXA_ACCESS_READ = {.stages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
 static daxa_Access const DAXA_ACCESS_COPY_READ = {.stages = VK_PIPELINE_STAGE_2_COPY_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
 static daxa_Access const DAXA_ACCESS_RESOLVE_READ = {.stages = VK_PIPELINE_STAGE_2_RESOLVE_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
@@ -39,7 +39,6 @@ static daxa_Access const DAXA_ACCESS_ACCELERATION_STRUCTURE_BUILD_READ = {.stage
 static daxa_Access const DAXA_ACCESS_RAY_TRACING_SHADER_READ = {.stages = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, .access_type = VK_ACCESS_2_MEMORY_READ_BIT};
 
 static daxa_Access const DAXA_ACCESS_TOP_OF_PIPE_WRITE = {.stages = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
-static daxa_Access const DAXA_ACCESS_DRAW_INDIRECT_WRITE = {.stages = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_VERTEX_SHADER_WRITE = {.stages = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_TESSELLATION_CONTROL_SHADER_WRITE = {.stages = VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_TESSELLATION_EVALUATION_SHADER_WRITE = {.stages = VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
@@ -52,7 +51,7 @@ static daxa_Access const DAXA_ACCESS_COMPUTE_SHADER_WRITE = {.stages = VK_PIPELI
 static daxa_Access const DAXA_ACCESS_TRANSFER_WRITE = {.stages = VK_PIPELINE_STAGE_2_TRANSFER_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_BOTTOM_OF_PIPE_WRITE = {.stages = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_HOST_WRITE = {.stages = VK_PIPELINE_STAGE_2_HOST_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
-static daxa_Access const DAXA_ACCESS_ALL_GRAPHICS_WRITE = {.stages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
+static daxa_Access const DAXA_ACCESS_ALL_RASTER_WRITE = {.stages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_WRITE = {.stages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_COPY_WRITE = {.stages = VK_PIPELINE_STAGE_2_COPY_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_RESOLVE_WRITE = {.stages = VK_PIPELINE_STAGE_2_RESOLVE_BIT, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
@@ -66,7 +65,6 @@ static daxa_Access const DAXA_ACCESS_ACCELERATION_STRUCTURE_BUILD_WRITE = {.stag
 static daxa_Access const DAXA_ACCESS_RAY_TRACING_SHADER_WRITE = {.stages = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, .access_type = VK_ACCESS_2_MEMORY_WRITE_BIT};
 
 static daxa_Access const DAXA_ACCESS_TOP_OF_PIPE_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
-static daxa_Access const DAXA_ACCESS_DRAW_INDIRECT_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_VERTEX_SHADER_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_TESSELLATION_CONTROL_SHADER_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_TESSELLATION_EVALUATION_SHADER_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
@@ -79,7 +77,7 @@ static daxa_Access const DAXA_ACCESS_COMPUTE_SHADER_READ_WRITE = {.stages = VK_P
 static daxa_Access const DAXA_ACCESS_TRANSFER_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_TRANSFER_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_BOTTOM_OF_PIPE_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_HOST_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_HOST_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
-static daxa_Access const DAXA_ACCESS_ALL_GRAPHICS_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
+static daxa_Access const DAXA_ACCESS_ALL_RASTER_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_COPY_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_COPY_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
 static daxa_Access const DAXA_ACCESS_RESOLVE_READ_WRITE = {.stages = VK_PIPELINE_STAGE_2_RESOLVE_BIT, .access_type = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT};
@@ -100,27 +98,6 @@ typedef struct
 
 static const daxa_BarrierInfo DAXA_DEFAULT_BARRIER_INFO = DAXA_ZERO_INIT;
 
-#if !DAXA_REMOVE_DEPRECATED
-/* deprecated("Use daxa_BarrierInfo instead; API:3.2") */
-#define daxa_MemoryBarrierInfo daxa_BarrierInfo
-#endif
-
-#if !DAXA_REMOVE_DEPRECATED
-
-/* deprecated("Use ImageBarrierInfo instead; API:3.2") */ typedef struct
-{
-    daxa_Access src_access;
-    daxa_Access dst_access;
-    daxa_ImageLayout src_layout;
-    daxa_ImageLayout dst_layout;
-    /* deprecated("Ignored parameter, whole image will be transitioned; API:3.2") */ daxa_ImageMipArraySlice image_slice;
-    daxa_ImageId image_id;
-} daxa_ImageMemoryBarrierInfo;
-
-static const daxa_ImageMemoryBarrierInfo DAXA_DEFAULT_BARRIER_IMAGE_TRANSITION_INFO = DAXA_ZERO_INIT;
-
-#endif
-
 typedef enum
 {
     DAXA_IMAGE_LAYOUT_OPERATION_NONE = 0,
@@ -132,7 +109,7 @@ typedef struct
 {
     daxa_Access src_access;
     daxa_Access dst_access;
-    daxa_ImageId image_id;
+    daxa_ImageId image;
     daxa_ImageLayoutOperation layout_operation;
 } daxa_ImageBarrierInfo;
 
@@ -175,6 +152,9 @@ daxa_timeline_semaphore_set_value(daxa_TimelineSemaphore timeline_semaphore, uin
 
 DAXA_EXPORT DAXA_NO_DISCARD daxa_Result
 daxa_timeline_semaphore_wait_for_value(daxa_TimelineSemaphore timeline_semaphore, uint64_t value, uint64_t timeout);
+
+DAXA_EXPORT DAXA_NO_DISCARD daxa_Result
+daxa_timeline_semaphore_signal_value(daxa_TimelineSemaphore timeline_semaphore, uint64_t value);
 
 DAXA_EXPORT VkSemaphore
 daxa_timeline_semaphore_get_vk_semaphore(daxa_TimelineSemaphore timeline_semaphore);

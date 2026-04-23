@@ -7,28 +7,42 @@
 
 namespace daxa
 {
-    static inline auto default_format_score(Format format, ColorSpace) -> i32
+    // Must stay ABI compatible with VkSurfaceFormatKHR.
+    struct SurfaceFormat
     {
-        switch (format)
-        {
-        case Format::B8G8R8A8_UNORM: return 90;
-        case Format::R8G8B8A8_UNORM: return 80;
-        case Format::B8G8R8A8_SRGB: return 70;
-        case Format::R8G8B8A8_SRGB: return 60;
-        default: return 0;
-        }
-    }
+        Format format = {};
+        ColorSpace color_space = {};
+    };
+
+    struct NativeWindowInfoWin32
+    {
+        void * hwnd = {};
+    };
+
+    struct NativeWindowInfoXlib
+    {
+        void * window = {};
+    };
+
+    struct NativeWindowInfoWayland
+    {
+        void* display = {};
+        void* surface = {};
+        u32 width = {};
+        u32 height = {};
+    };
+
+    using NativeWindowInfo = Variant<NativeWindowInfoWin32, NativeWindowInfoXlib, NativeWindowInfoWayland>;
 
     struct SwapchainInfo
     {
-        NativeWindowHandle native_window;
-        NativeWindowPlatform native_window_platform;
-        i32 (*surface_format_selector)(Format, ColorSpace) = default_format_score;
+        NativeWindowInfo native_window_info = NativeWindowInfoWin32{};
+        SurfaceFormat surface_format = {};
         PresentMode present_mode = PresentMode::FIFO;
         PresentOp present_operation = PresentOp::IDENTITY;
         ImageUsageFlags image_usage = {};
         usize max_allowed_frames_in_flight = 2;
-        QueueFamily queue_family = {};
+        QueueType queue_type = {};
         SmallString name = {};
     };
 
